@@ -9,7 +9,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/intec-co/mongo-documents.git"
+        "url": "git+https://github.com/intec-co/monguments.git"
     },
     "keywords": [
         "mongo",
@@ -23,7 +23,7 @@
     "author": "intec.co <contacto@intec.co> (http://intec.co)",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/intec-co/mongo-features/issues"
+        "url": "https://github.com/intec-co/monguments/issues"
     },
-    "homepage": "https://github.com/intec-co/mongo-features#readme"
+    "homepage": "https://github.com/intec-co/monguments#readme"
 }
