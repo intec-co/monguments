@@ -42,7 +42,7 @@ process
 ## Configuration
 ~~~javascript
 let conf = {
-    server: 'localhost',
+	server: 'localhost',
 	database: 'test'
 	user: 'user',
 	password: 'pwd',
@@ -53,8 +53,8 @@ let conf = {
 ## Features
 ~~~javascript
 let collections = {
-    owner: "_id",
-    versionable: false,
+	owner: "_id",
+	versionable: false,
 	versionTime: 0,
 	closable: false,
 	closeTime: 0,
