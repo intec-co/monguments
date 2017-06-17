@@ -1,5 +1,8 @@
 # monguments
 Manage your mongo documents with features.
+
+[![npm][npm-badge]][alpha]
+
 ## Installation
 ```bash
 npm install monguments
@@ -31,7 +34,7 @@ let collections = {
 	required: []
 }
 
-var myMoguments
+var myMoguments;
 
 monguments(conf, collections,
     connector => {
