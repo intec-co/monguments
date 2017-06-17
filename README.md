@@ -1,16 +1,53 @@
-# mongo-link
-Easy connector to use with mongo-documents and mongo-operations
+# monguments
+Manage your mongo documents with features.
 ## Installation
 ```bash
-npm install mongo-link
+npm install monguments
 ```
 
 ## Usage
-### Get link 
 ~~~javascript
-link.link(conf, collections, callback);
+let monguments = require('monguments');
+
+let conf = {
+    server: 'localhost',
+	database: 'test'
+	user: 'user',
+	password: 'pwd',
+	replicaSet: 'replicaSet',
+}
+
+let collections = {
+    owner: "_id",
+	versionable: false,
+	versionTime: 0,
+	closable: false,
+	closeTime: 0,
+	exclusive: false,
+	id: '_id',
+	idAuto: true,
+	add: [],
+	set: [],
+	required: []
+}
+
+var myMoguments
+
+monguments(conf, collections,
+    connector => {
+        myMoguments = connector;
+    });
 ~~~
-### Get link wiht operations and documents
-~~~javascript
-link.linkOperations(conf, collections, callback);
-~~~
+## Configuration
+
+## Features
+### Owner
+### Versionable
+### Closable
+### Exclusive
+### Id
+### Add
+### Set
+### Required
+
+## Callback

@@ -1,5 +1,5 @@
 {
-    "name": "mongo-documents",
+    "name": "monguments",
     "version": "0.0.1",
     "description": "Manage documents in Mongo defining features",
     "main": "index.js",
