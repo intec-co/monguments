@@ -1,6 +1,6 @@
 'use strict';
 let MongoClient = require('mongodb').MongoClient;
-let connectorDocs = require('./constructor');
+let monguments = require('./monguments');
 
 module.exports = function connector(conf, collections, callback) {
     var mongoUrl = 'mongodb://';
@@ -16,7 +16,7 @@ module.exports = function connector(conf, collections, callback) {
         }
         else {
             console.log("Connected to " + conf.database);
-            callback(new connectorDocs(db, collections));
+            callback(new monguments(db, collections));
         }
     });
 };
