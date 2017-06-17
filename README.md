@@ -54,7 +54,7 @@ let conf = {
 ~~~javascript
 let collections = {
     owner: "_id",
-	versionable: false,
+    versionable: false,
 	versionTime: 0,
 	closable: false,
 	closeTime: 0,
