@@ -1,29 +1,29 @@
 {
-    "name": "monguments",
-    "version": "0.0.2",
-    "description": "Manage documents in Mongo defining features",
-    "main": "index.js",
-    "scripts": {
-        "test": "node example.js",
-        "postversion": "git push"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/intec-co/monguments.git"
-    },
-    "keywords": [
-        "mongo",
-        "features",
-        "operations",
-        "documents"
-    ],
-    "dependencies": {
-        "mongodb": "*"
-    },
-    "author": "intec.co <contacto@intec.co> (http://intec.co)",
-    "license": "MIT",
-    "bugs": {
-        "url": "https://github.com/intec-co/monguments/issues"
-    },
-    "homepage": "https://github.com/intec-co/monguments#readme"
+  "name": "monguments",
+  "version": "0.0.3",
+  "description": "Manage documents in Mongo defining features",
+  "main": "index.js",
+  "scripts": {
+    "test": "node example.js",
+    "postversion": "git push"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intec-co/monguments.git"
+  },
+  "keywords": [
+    "mongo",
+    "features",
+    "operations",
+    "documents"
+  ],
+  "dependencies": {
+    "mongodb": "*"
+  },
+  "author": "intec.co <contacto@intec.co> (http://intec.co)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/intec-co/monguments/issues"
+  },
+  "homepage": "https://github.com/intec-co/monguments#readme"
 }
