@@ -19,7 +19,7 @@ module.exports = function (mongo, request, permissions, collection, callback) {
     if (!callback)
         callback = function () { };
     if (!request) {
-        callback({ error: "operation" + msg });
+        callback({ error: "request null or undefined" + msg });
         return;
     }
     if (!permissions) {

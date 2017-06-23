@@ -2,7 +2,7 @@
 let MongoClient = require('mongodb').MongoClient;
 let monguments = require('./monguments');
 
-module.exports = function connector(conf, collections, callback) {
+module.exports = function (conf, collections, callback) {
     var mongoUrl = 'mongodb://';
     if (conf.user !== undefined)
         mongoUrl += conf.user + ':' + conf.password + '@';

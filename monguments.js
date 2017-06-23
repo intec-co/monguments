@@ -12,7 +12,22 @@ function MongoDocs(db, collections) {
     this.collections = {};
     this.link = {
         db: this.db,
-        collections: collections
+        collections: collections,
+        collection: function (collection) {
+            return db.collection(collection);
+        },
+        getCollectionsProperties: function () {
+            return collections;
+        },
+        getCollectionProperties: function (collection) {
+            if (collections[collection])
+                return collections[collection];
+            else
+                return null;
+        },
+        getCollectionId: function (collection) {
+            return collections[collection].id;
+        }
     };
     for (var coll in collections) {
         if (collections[coll].versionable && collections[coll].id === "_id") {
