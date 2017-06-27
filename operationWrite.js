@@ -99,7 +99,7 @@ function newDoc(db, collection, conf, data, callback) {
     if (conf.versionable)
         data._isLast = true;
     if (conf.idAuto) {
-        getId(db.collection('_counters'), collection, function (err, doc) {
+        getId(db.collection('counters'), collection, function (err, doc) {
             data[idColl] = doc.value.seq;
             coll.insertOne(data, function (err, result) {
                 if (err)

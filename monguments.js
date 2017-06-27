@@ -76,7 +76,7 @@ MongoDocs.prototype.close = function (collection, request, callback) {
     close(this.link, collection, request, callback);
 };
 MongoDocs.prototype.getCounter = function (collection, callback) {
-    this.db.collection('_counters').findOneAndUpdate(
+    this.db.collection('counters').findOneAndUpdate(
         { _id: collection }, { $inc: { seq: 1 } }, { upsert: true, returnOriginal: false },
         callback);
 }

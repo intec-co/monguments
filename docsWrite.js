@@ -35,17 +35,16 @@ function writeOne(mongo, collection, request, res, idx, callback) {
 
 module.exports = function (mongo, collection, request, permissions, callback) {
     var owner = mongo.getCollectionProperties(collection);
+    var permission = permissions.charAt(1);
     if (Array.isArray(request.data)) {
-        var permission = permissions.charAt(1);
         var res = [];
-        if (permission === 'W') {
+        if (permission === 'W' || permission === "C") {
             writeOne(mongo, collection, request, res, 0, callback);
         }
         else
             callback({ error: "No tiene permisos para esta operación" });
     }
     else {
-        var permission = permissions.charAt(1);
         var idColl = mongo.getCollectionId(collection);
         if (request.data === undefined || request.data === null) {
             callback({ error: "sin datos" });
@@ -58,7 +57,7 @@ module.exports = function (mongo, collection, request, permissions, callback) {
             else
                 writeDoc(mongo, collection, request, idColl, callback);
         }
-        else if (permission === 'c' && request.data[idColl] === undefined)
+        else if (permission === 'C' || permision === 'c')
             writeDoc(mongo, collection, request, idColl, callback);
         else
             callback({ error: "No tiene permisos para esta operación" });
