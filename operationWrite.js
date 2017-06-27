@@ -168,6 +168,14 @@ module.exports = function (mongo, collection, request, callback) {
         callback({ error: 'id collection undefined' });
         return;
     }
+    if (conf.required.length > 0) {
+        for (let prop of conf.required) {
+            if (request.data[prop] === undefined || request.data[prop] === null) {
+                callback({ error: `property ${prop} es required` });
+                return;
+            }
+        }
+    }
     var action = 'findDoc';
     var query = {};
     if (request.data[idColl] !== null && request.data[idColl] !== undefined)

@@ -44,7 +44,7 @@ function setMulti(mongo, request, permission, collection, res, idx, callback) {
 function setOne(mongo, request, permission, collection, callback) {
     if (permission === 'W' || permission === 'w' || permission === 's') {
         if (permission === 'w' || permission === 's') {
-            var owner = mongo.getCollectionProperties(collection);
+            var owner = mongo.getCollectionProperties(collection).owner;
             if (request.data.query[owner] !== request.user) {
                 callback({ error: "No tiene persmisos para esta operación" });
                 return;

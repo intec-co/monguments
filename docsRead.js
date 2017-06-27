@@ -6,7 +6,7 @@ let hasPermission = require('./hasPermission');
 module.exports = {
     read: function (mongo, collection, request, permissions, callback) {
         var permission = permissions.charAt(0);
-        var owner = mongo.getCollectionProperties(collection);
+        var owner = mongo.getCollectionProperties(collection).owner;
         if (hasPermission(permission, owner, request)) {
             var cursor = read(mongo, collection, request);
             cursor.next(function (err, doc) {
@@ -22,7 +22,7 @@ module.exports = {
     },
     readList: function (mongo, collection, request, permissions, callback) {
         var permission = permissions.charAt(0);
-        var owner = mongo.getCollectionProperties(collection);
+        var owner = mongo.getCollectionProperties(collection).owner;
         if (hasPermission(permission, owner, request)) {
             var cursor = read(mongo, collection, request);
             cursor.toArray(function (err, array) {

@@ -34,7 +34,7 @@ function writeOne(mongo, collection, request, res, idx, callback) {
 };
 
 module.exports = function (mongo, collection, request, permissions, callback) {
-    var owner = mongo.getCollectionProperties(collection);
+    var owner = mongo.getCollectionProperties(collection).owner;
     var permission = permissions.charAt(1);
     if (Array.isArray(request.data)) {
         var res = [];
