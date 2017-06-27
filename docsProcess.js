@@ -14,7 +14,7 @@ let hasPermission = require('./hasPermission');
  * @param collection nombre de la colleción
  * @param callback función que recibe la respuesta
  */
-module.exports = function (mongo, request, permissions, collection, callback) {
+module.exports = function (mongo, collection, request, permissions, callback) {
     var msg = " is undefined o null";
     if (!callback)
         callback = function () { };
@@ -44,7 +44,7 @@ module.exports = function (mongo, request, permissions, collection, callback) {
     }
     switch (request.operation) {
         case "write":
-            docsWrite(mongo, request, permissions, collection, callback);
+            docsWrite(mongo, collection, request, permissions, callback);
             break;
         case "count":
             var permission = permissions.charAt(0);
@@ -63,13 +63,13 @@ module.exports = function (mongo, request, permissions, collection, callback) {
                 callback({ error: "No tiene permisos para esta operación" });
             break;
         case "read":
-            docsRead.read(mongo, request, permissions, collection, callback);
+            docsRead.read(mongo, collection, request, permissions, callback);
             break;
         case "readList":
-            docsRead.readList(mongo, request, permissions, collection, callback);
+            docsRead.readList(mongo, collection, request, permissions, callback);
             break;
         case "set":
-            docsSet(mogno, request, permissions, collection, callback);
+            docsSet(mongo, collection, request, permissions, callback);
             break;
         case "add":
             var permission = permissions.charAt(1);
@@ -83,7 +83,7 @@ module.exports = function (mongo, request, permissions, collection, callback) {
             var permission = permissions.charAt(1);
             var owner = mongo.getCollectionProperties(collection);
             if (hasPermission(permission, owner, request))
-                close(mongo, request, collection, callback);
+                close(mongo, collection, request, callback);
             else
                 callback({ err: "No tiene permisos para esta operación" });
             break;

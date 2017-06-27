@@ -82,6 +82,11 @@ function newVersion(coll, query, data, callback) {
     });
 }
 function newDoc(db, collection, conf, data, callback) {
+    console.log("collection: ", collection);
+    console.log("conf");
+    console.log(conf);
+    console.log("data");
+    console.log(data);
     var idColl = conf.id;
     var coll = db.collection(collection);
     data._date = data._w.date;
@@ -94,7 +99,7 @@ function newDoc(db, collection, conf, data, callback) {
     if (conf.versionable)
         data._isLast = true;
     if (conf.idAuto) {
-        getId(db.collection('counters'), collection, function (err, doc) {
+        getId(db.collection('_counters'), collection, function (err, doc) {
             data[idColl] = doc.value.seq;
             coll.insertOne(data, function (err, result) {
                 if (err)
@@ -148,7 +153,7 @@ function close(coll, query, w, callback) {
     });
 };
 
-module.exports = function (mongo, request, collection, callback) {
+module.exports = function (mongo, collection, request, callback) {
     var conf = mongo.getCollectionProperties(collection);
     if (request.data === undefined) {
         callback({ error: 'data undefined' });
@@ -185,6 +190,7 @@ module.exports = function (mongo, request, collection, callback) {
         delete request.data._id;
     }
     var db = mongo.db;
+    console.log(action);
     switch (action) {
         case 'newDoc':
             newDoc(db, collection, conf, data, callback);

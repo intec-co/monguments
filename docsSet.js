@@ -55,7 +55,7 @@ function setOne(mongo, request, permission, collection, callback) {
                 callback({ error: "Error en docs set" });
             else {
                 if (array.length === 1)
-                    set(mongo, request, collection, callback);
+                    set(mongo, collection, request, callback);
                 else if (array.length > 1) {
                     var idColl = mongo.getCollectionId(collection);
                     if (idColl !== undefined) {
@@ -91,7 +91,7 @@ function setArray(mongo, request, collection, array, idColl, idx, callback) {
         callback({ msg: "documentos actuliazados" });
     }
 };
-module.exports = function (mongo, request, permissions, collection, callback) {
+module.exports = function (mongo, collection, request, permissions, callback) {
     var permission = permissions.charAt(1);
     if (Array.isArray(request.data)) {
         var res = [];

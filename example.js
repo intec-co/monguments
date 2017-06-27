@@ -2,7 +2,7 @@
 var monguments = require('./index');
 
 let conf = {
-    server: '168.176.61.6',
+    server: 'localhost',
     database: 'test'
 }
 
@@ -54,10 +54,49 @@ var myMonguments;
 monguments(conf, collections,
     connector => {
         myMonguments = connector;
-        test();
+        testWrite();
+        /*testAdd();
+        testRead();
+        testSet();
+        testClosed();*/
     });
 
-function test() {
+function testWrite() {
+    console.log("testWrite");
+    var req1 = {
+        user: "myUser",
+        ips: "localhost",
+        operation: "write",
+        data: {
+            type: "testing 1"
+        }
+    }
+    var collection = "coll2"
+
+    myMonguments.process(collection, req1, "RW", response => {
+        console.log(`coll1 write new document response:`);
+        console.log(response);
+
+        setTimeout(function () {
+            var req1_1 = {
+                user: "myUser",
+                ips: "localhost",
+                operation: "write",
+                data: {
+                    type: "testing 2",
+                    id: response.data.id
+                }
+            }
+            myMonguments.process(collection, req1_1, "RW", response => {
+                console.log(`${collection} write new document response:`);
+                console.log(response);
+                myMonguments.db.close();
+            });
+        }, 65000);
+    });
+}
+
+function testAdd() {
     var add = {
         user: "myUser",
         ips: "localhost",
@@ -70,36 +109,5 @@ function test() {
             }
         }
     };
-    myMonguments.add(add, "coll2", output => console.log(output));
-
-
-    /*
-        var req1 = {
-            user: "myUser",
-            ips: "localhost",
-            operation: "write",
-            data: {
-                type: "testing 1"
-            }
-        }
-    
-        myMonguments.process(req1, "RW", "coll2", response => {
-            console.log(`coll1 write new document response:}`);
-            console.log(response);
-            
-            /*setTimeout(function () {
-                var req1_1 = {
-                    user: "myUser",
-                    ips: "localhost",
-                    operation: "write",
-                    data: {
-                        type: "testing 2",
-                        id: response.data.id
-                    }
-                }
-                myMonguments.process(req1_1, "RW", "coll1", response => {
-                    console.log(`coll1 write new document response: ${response}`);
-                });
-            }, 65000);*/
-    //});
+    myMonguments.add("coll2", add, output => console.log(output));
 }

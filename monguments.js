@@ -57,26 +57,26 @@ MongoDocs.prototype.getCollectionProperties = function (collection) {
 MongoDocs.prototype.getCollectionId = function (collection) {
     return this.collections[collection].id;
 };
-MongoDocs.prototype.process = function (request, permissions, collection, callback) {
-    process(this.link, request, permissions, collection, callback);
+MongoDocs.prototype.process = function (collection, request, permissions, callback) {
+    process(this.link, collection, request, permissions, callback);
 };
-MongoDocs.prototype.write = function (request, collection, callback) {
-    write(this.link, request, collection, callback);
+MongoDocs.prototype.write = function (collection, request, callback) {
+    write(this.link, collection, request, callback);
 };
-MongoDocs.prototype.set = function (request, collection, callback) {
-    set(this.link, request, collection, callback);
+MongoDocs.prototype.set = function (collection, request, callback) {
+    set(this.link, collection, request, callback);
 };
-MongoDocs.prototype.add = function (request, collection, callback) {
-    add(this.link, request, collection, callback);
+MongoDocs.prototype.add = function (collection, request, callback) {
+    add(this.link, collection, request, callback);
 };
-MongoDocs.prototype.read = function (request, collection) {
-    read(this.link, request, collection);
+MongoDocs.prototype.read = function (collection, request) {
+    read(this.link, collection, request);
 };
-MongoDocs.prototype.close = function (request, collection, callback) {
-    close(this.link, request, collection, callback);
+MongoDocs.prototype.close = function (collection, request, callback) {
+    close(this.link, collection, request, callback);
 };
 MongoDocs.prototype.getCounter = function (collection, callback) {
-    this.db.collection('counters').findOneAndUpdate(
+    this.db.collection('_counters').findOneAndUpdate(
         { _id: collection }, { $inc: { seq: 1 } }, { upsert: true, returnOriginal: false },
         callback);
 }

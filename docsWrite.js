@@ -2,8 +2,8 @@
 
 let write = require('./operationWrite');
 
-function writeDoc(mongo, request, collection, idColl, callback) {
-    write(mongo, request, collection, function (doc) {
+function writeDoc(mongo, collection, request, idColl, callback) {
+    write(mongo, collection, request, function (doc) {
         if (doc.error)
             callback(doc);
         else {
@@ -19,13 +19,13 @@ function writeDoc(mongo, request, collection, idColl, callback) {
     });
 };
 
-function writeOne(mongo, request, collection, res, idx, callback) {
+function writeOne(mongo, collection, request, res, idx, callback) {
     if (idx < request.data.length) {
         var item = request.data[idx];
         var idColl = mongo.getCollectionId(collection).id;
-        writeDoc(mongo, request, collection, idColl, function (response) {
+        writeDoc(mongo, collection, request, idColl, function (response) {
             res.push(response);
-            writeOne(mongo, request, collection, res, idx + 1, callback);
+            writeOne(mongo, collection, request, res, idx + 1, callback);
         });
     }
     else {
@@ -33,13 +33,13 @@ function writeOne(mongo, request, collection, res, idx, callback) {
     }
 };
 
-module.exports = function (mongo, request, permissions, collection, callback) {
+module.exports = function (mongo, collection, request, permissions, callback) {
     var owner = mongo.getCollectionProperties(collection);
     if (Array.isArray(request.data)) {
         var permission = permissions.charAt(1);
         var res = [];
         if (permission === 'W') {
-            writeOne(mongo, request, collection, res, 0, callback);
+            writeOne(mongo, collection, request, res, 0, callback);
         }
         else
             callback({ error: "No tiene permisos para esta operación" });
@@ -56,10 +56,10 @@ module.exports = function (mongo, request, permissions, collection, callback) {
                 callback({ error: "no tiene permiso para escribir el documento" });
             }
             else
-                writeDoc(mongo, request, collection, idColl, callback);
+                writeDoc(mongo, collection, request, idColl, callback);
         }
         else if (permission === 'c' && request.data[idColl] === undefined)
-            writeDoc(mongo, request, collection, idColl, callback);
+            writeDoc(mongo, collection, request, idColl, callback);
         else
             callback({ error: "No tiene permisos para esta operación" });
     }
