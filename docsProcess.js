@@ -75,7 +75,7 @@ module.exports = function (mongo, collection, request, permissions, callback) {
             var permission = permissions.charAt(1);
             var owner = mongo.getCollectionProperties(collection);
             if (hasPermission(permission, owner, request))
-                add(mongo, request, collection, callback);
+                add(mongo, collection, request, callback);
             else
                 callback({ err: "No tiene permisos para esta operación" });
             break;

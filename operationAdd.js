@@ -53,7 +53,7 @@ function write(coll, conf, request, opened, toClosed, callback) {
 }
 
 module.exports = function (mongo, collection, request, callback) {
-    if (request.data.add === undefined || request.data.query === undefined) {
+    if (request.data === undefined || request.data.add === undefined || request.data.query === undefined) {
         callback({ error: 'data or query is undefined' });
         return;
     }
