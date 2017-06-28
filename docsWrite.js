@@ -8,7 +8,7 @@ function writeDoc(mongo, collection, request, idColl, callback) {
             callback(doc);
         else {
             var res = {
-                msg: "Los datos fueron Guardados con exito"
+                msg: doc.msg
             };
             if (!request.data[idColl]) {
                 res.data = {};

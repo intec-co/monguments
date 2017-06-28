@@ -32,14 +32,14 @@ let collections = {
         add: ["note1"],
         addClosed: ["note2"],
         set: [],
-        required: []
+        required: ["required"]
     },
     coll3: {
         owner: "_id",
         versionable: false,
         versionTime: 0,
-        closable: false,
-        closeTime: 0,
+        closable: true,
+        closeTime: 1,
         exclusive: false,
         id: '_id',
         idAuto: true,
@@ -68,13 +68,14 @@ function testWrite() {
         ips: "localhost",
         operation: "write",
         data: {
-            type: "testing 1"
+            type: "testing 1",
+            required: true
         }
     }
-    var collection = "coll2"
+    var collection = "coll3"
 
     myMonguments.process(collection, req1, "RW", response => {
-        console.log(`coll1 write new document response:`);
+        console.log(`${collection} write new document response:`);
         console.log(response);
 
         setTimeout(function () {
@@ -83,12 +84,13 @@ function testWrite() {
                 ips: "localhost",
                 operation: "write",
                 data: {
-                    type: "testing 2",
-                    id: response.data.id
+                    $type: "testing 2",
+                    required: true,
+                    _id: response.data._id
                 }
             }
             myMonguments.process(collection, req1_1, "RW", response => {
-                console.log(`${collection} write new document response:`);
+                console.log(`${collection} write last document response:`);
                 console.log(response);
                 myMonguments.db.close();
             });

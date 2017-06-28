@@ -82,11 +82,6 @@ function newVersion(coll, query, data, callback) {
     });
 }
 function newDoc(db, collection, conf, data, callback) {
-    console.log("collection: ", collection);
-    console.log("conf");
-    console.log(conf);
-    console.log("data");
-    console.log(data);
     var idColl = conf.id;
     var coll = db.collection(collection);
     data._date = data._w.date;
@@ -105,8 +100,10 @@ function newDoc(db, collection, conf, data, callback) {
                 if (err)
                     callback({ error: err });
                 else {
-                    if (callback !== undefined)
+                    if (callback !== undefined) {
+                        result.msg = "Los datos fueron guardados"
                         callback(result);
+                    }
                 }
             });
         });
@@ -137,9 +134,15 @@ function overwrite(coll, query, data, callback) {
             callback({ error: err, msg: "operations overwrite" });
         else {
             if (result.result.n > 0)
-                callback({ data: result.result.n });
+                callback({
+                    msg: "Los datos fueron guardados",
+                    data: result.result.n
+                });
             else
-                callback({ data: 0 });
+                callback({
+                    msg: "Los datos fueron guardados",
+                    data: 0
+                });
         }
     });
 };
@@ -198,7 +201,6 @@ module.exports = function (mongo, collection, request, callback) {
         delete request.data._id;
     }
     var db = mongo.db;
-    console.log(action);
     switch (action) {
         case 'newDoc':
             newDoc(db, collection, conf, data, callback);
@@ -228,6 +230,7 @@ module.exports = function (mongo, collection, request, callback) {
                                 ips: request.ips
                             };
                             close(coll, query, w, callback);
+                            break;
                         case 'unfair':
                             callback({ error: "write unfair" });
                             break;

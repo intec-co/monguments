@@ -1,11 +1,11 @@
 'use strict';
 
-let process = require('./docsProcess');
-let write = require("./operationWrite");
-let set = require("./operationSet");
-let add = require('./operationAdd');
-let read = require('./operationRead');
-let close = require('./operationClose');
+const process = require('./docsProcess');
+const write = require("./operationWrite");
+const set = require("./operationSet");
+const add = require('./operationAdd');
+const read = require('./operationRead');
+const close = require('./operationClose');
 
 function MongoDocs(db, collections) {
     this.db = db;
@@ -30,6 +30,28 @@ function MongoDocs(db, collections) {
         }
     };
     for (var coll in collections) {
+        if (!collections[coll].owner)
+            collections[coll].owner = null;
+        if (!collections[coll].versionable)
+            collections[coll].versionable = false;
+        if (!collections[coll].versionTime)
+            collections[coll].versionTime = 0;
+        if (!collections[coll].closable)
+            collections[coll].closable = false;
+        if (!collections[coll].closeTime)
+            collections[coll].closeTime = 0;
+        if (!collections[coll].exclusive)
+            collections[coll].exclusive = false;
+        if (!collections[coll].id)
+            collections[coll].id = '_id';
+        if (!collections[coll].idAuto)
+            collections[coll].idAuto = false;
+        if (!collections[coll].add)
+            collections[coll].add = [];
+        if (!collections[coll].set)
+            collections[coll].set = [];
+        if (!collections[coll].required)
+            collections[coll].required = [];
         if (collections[coll].versionable && collections[coll].id === "_id") {
             console.error(`error: with collection ${coll}, it's not allowed versionable with id "_id"`)
         }
