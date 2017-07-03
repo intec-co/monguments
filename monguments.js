@@ -92,7 +92,7 @@ MongoDocs.prototype.add = function (collection, request, callback) {
     add(this.link, collection, request, callback);
 };
 MongoDocs.prototype.read = function (collection, request) {
-    read(this.link, collection, request);
+    return read(this.link, collection, request);
 };
 MongoDocs.prototype.close = function (collection, request, callback) {
     close(this.link, collection, request, callback);
