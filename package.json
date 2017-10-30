@@ -1,6 +1,6 @@
 {
     "name": "monguments",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "description": "Manage documents in Mongo defining features",
     "main": "index.js",
     "scripts": {
