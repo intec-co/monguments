@@ -50,7 +50,7 @@ function setOne(mongo, request, permission, collection, callback) {
                 return;
             }
         }
-        read(mongo, collection, request).toArray(function (err, array) {
+        read(mongo, collection, { data: request.data.query }).toArray(function (err, array) {
             if (err)
                 callback({ error: "Error en docs set" });
             else {
@@ -63,8 +63,7 @@ function setOne(mongo, request, permission, collection, callback) {
                     }
                 }
                 else {
-                    res.msg = "Nada para cambiar";
-                    callback(res);
+                    callback({ msg: "Nada para cambiar" });
                 }
             }
         });

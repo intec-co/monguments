@@ -18,7 +18,7 @@ module.exports = function (mongo, collection, request) {
     if (param) {
         if (param.lookup) {
             var aggregation = [
-                { $match: param.query },
+                { $match: query },
                 { $lookup: param.lookup }
             ];
             if (param.sort !== undefined)
@@ -31,7 +31,7 @@ module.exports = function (mongo, collection, request) {
                 project = param.project;
                 aggregation.push({ $project: project });
             }
-            return mongo.collection(collection).agregate(aggregation);
+            return mongo.collection(collection).aggregate(aggregation);
         }
         else {
             var cursor = mongo.collection(collection).find(query);
