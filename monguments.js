@@ -53,7 +53,7 @@ function MongoDocs(db, collections) {
         if (!collections[coll].required)
             collections[coll].required = [];
         if (collections[coll].versionable && collections[coll].id === "_id") {
-            console.error(`error: with collection ${coll}, it's not allowed versionable with id "_id"`)
+            console.error(`error: in collection ${coll}, it's not allowed versionable with id "_id"`)
         }
         else
             this.collections[coll] = JSON.parse(JSON.stringify(collections[coll]));

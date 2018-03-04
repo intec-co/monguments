@@ -81,19 +81,21 @@ let conf = {
 ## Features
 ~~~javascript
 let collections = {
-    myCollection: {
-        owner: '_id',
-        versionable: false,
-        versionTime: 0,
-        closable: false,
-        closeTime: 0,
-        exclusive: false,
-        id: '_id',
-        idAuto: true,
-        add: [],
-        set: [],
-        required: []
-    }
+	myCollection: {
+		id: '_id',
+		owner: '_id',
+		versionable: false,
+		versionTime: 0,
+		closable: false,
+		closeTime: 0,
+		exclusive: false,
+		idAuto: true,
+		add: [],
+		set: [],
+		addClosed: [], //Todo
+		setClosed: [],//Todo
+		required: []
+	}
 }
 ~~~
 ### Owner
