@@ -70,39 +70,58 @@ var response = {
 ## Configuration
 ~~~javascript
 let conf = {
-	server: 'localhost',
-	database: 'test',
-	user: 'user',
-	password: 'pwd',
-	replicaSet: 'replicaSet',
+  server: 'localhost',
+  database: 'test',
+  user: 'user',
+  password: 'pwd',
+  replicaSet: 'replicaSet',
 }
 ~~~
 
 ## Features
 ~~~javascript
 let collections = {
-	myCollection: {
-		id: '_id',
-		owner: '_id',
-		versionable: false,
-		versionTime: 0,
-		closable: false,
-		closeTime: 0,
-		exclusive: false,
-		idAuto: true,
-		add: [],
+  myCollection: {
+    id: '_id',
+    idAuto: true,
+    owner: '_id',
+    versionable: false,
+    versionTime: 0,
+    closable: false,
+    closeTime: 0,
+    exclusive: false,
+    add: [],
 		set: [],
-		addClosed: [], //Todo
-		setClosed: [],//Todo
-		required: []
-	}
+		setHistory: true;//Todo
+    addClosed: [],//Todo
+    setClosed: [],//Todo
+    required: [],//Todo
+    lookup: {//Todo
+      collection:{
+        localField: '',
+        foreignField: ''
+      }
+    }
+  }
 }
 ~~~
-### Owner
-### Versionable
-### Closable
-### Exclusive
-### Id
-### Add
-### Set
-### Required
+### id
+### idAuto
+### owner
+The field for id of user propetary.
+### versionable
+Create version of documents in write, values: `true/false`.  
+Is not compatible with `id: '_id'`.
+### versionTime
+Every how much a new version is saved (minutes)
+### closable
+The documents is closable for write
+### closeTime
+### exclusive
+Only write for the owner
+### add
+### set
+### setHistory
+### addClosed
+### setClosed
+### required
