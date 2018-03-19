@@ -11,6 +11,7 @@ module.exports = function (conf, collections, callback) {
 		mongoUrl += '?replicaSet=' + conf.replicaSet;
 	MongoClient.connect(mongoUrl, function (err, client) {
 		if (err) {
+			console.error(err)
 			callback(null);
 			throw new Error('Could not connect to mongodb');
 		}
