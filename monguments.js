@@ -8,13 +8,14 @@ const read = require('./operationRead');
 const close = require('./operationClose');
 
 function MongoDocs(client, dbName, collections) {
+	this.client = client;
 	this.db = client.db(dbName);
 	this.collections = {};
 	this.link = {
 		db: this.db,
 		collections: collections,
 		collection: function (collection) {
-			return db.collection(collection);
+			return this.db.collection(collection);
 		},
 		getCollectionsProperties: function () {
 			return collections;
@@ -62,6 +63,11 @@ function MongoDocs(client, dbName, collections) {
 Object.defineProperty(MongoDocs, 'db', {
 	get: function () {
 		return this.db;
+	}
+});
+Object.defineProperty(MongoDocs, 'client', {
+	get: function () {
+		return this.client;
 	}
 });
 MongoDocs.prototype.collection = function (collection) {
