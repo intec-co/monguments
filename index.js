@@ -6,7 +6,7 @@ module.exports = function (conf, collections, callback) {
 	var mongoUrl = 'mongodb://';
 	if (conf.user !== undefined)
 		mongoUrl += conf.user + ':' + conf.password + '@';
-	mongoUrl += conf.server + '/' + conf.database;
+	mongoUrl += conf.server + '/' + conf.dbName;
 	if (conf.replicaSet !== undefined)
 		mongoUrl += '?replicaSet=' + conf.replicaSet;
 	MongoClient.connect(mongoUrl, function (err, client) {
