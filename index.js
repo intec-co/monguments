@@ -15,7 +15,7 @@ module.exports = function (conf, collections, callback) {
 			throw new Error('Could not connect to mongodb');
 		}
 		else {
-			callback(new monguments(client, conf.name, collections));
+			callback(new monguments(client, conf.dbName, collections));
 		}
 	});
 };
