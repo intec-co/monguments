@@ -10,7 +10,7 @@ High traceability.
 
 ## Installation
 ```bash
-npm install monguments
+npm install  --save monguments
 ```
 
 ## Usage
@@ -79,6 +79,12 @@ let conf = {
 ~~~
 
 ## Features
+Moguments add the following properties to documents:
+- _isLast: hidden documents with version.
+- _w: information about the user who write.
+- _closed: for documents that do not modify.
+- _"property"_h: property es the name in object, have the history of modifycation.
+
 ~~~javascript
 let collections = {
   myCollection: {
