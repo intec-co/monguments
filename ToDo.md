@@ -1,0 +1,1 @@
+- restringir set para multiples documentos
