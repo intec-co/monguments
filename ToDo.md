@@ -1,1 +1,2 @@
 - restringir set para multiples documentos
+- _isLast: true para todos los documentos
