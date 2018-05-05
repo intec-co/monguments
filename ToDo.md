@@ -1,1 +1,2 @@
 - restringir set para multiples documentos
+- projection para roles
