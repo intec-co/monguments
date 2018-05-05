@@ -1,2 +1,3 @@
 - restringir set para multiples documentos
 - projection para roles
+- _isLast: true para todos los documentos
