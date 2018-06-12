@@ -3,7 +3,7 @@ var monguments = require('./index');
 
 let conf = {
 	server: 'localhost',
-	database: 'test'
+	dbName: 'test'
 }
 
 let collections = {
@@ -44,7 +44,7 @@ let collections = {
 		id: '_id',
 		idAuto: true,
 		add: [],
-		set: [],
+		set: ["setting"],
 		required: []
 	}
 }
@@ -54,11 +54,11 @@ var myMonguments;
 monguments(conf, collections,
 	connector => {
 		myMonguments = connector;
-		testWrite();
+		//testWrite(testClose);
 		/*testAdd();
 		testRead();
-		testSet();
-		testClosed();*/
+		testSet();*/
+		testClose();
 	});
 
 function testWrite() {
@@ -112,4 +112,45 @@ function testAdd() {
 		}
 	};
 	myMonguments.add("coll2", add, output => console.log(output));
+}
+
+function testClose() {
+	var req1 = {
+		user: "myUser",
+		ips: "localhost",
+		operation: "write",
+		data: {
+			type: "testing 1",
+			required: true
+		}
+	}
+	var collection = "coll3"
+
+	myMonguments.process(collection, req1, "RW", response => {
+		var req2 = {
+			user: "myUser",
+			ips: "localhost",
+			operation: "close",
+			data: {
+				_id: response.data._id
+			}
+		}
+		myMonguments.process(collection, req2, "RW", response2 => {
+			console.log(response);
+			console.log(response2);
+			var req3 = {
+				user: "myUser",
+				ips: "localhost",
+				operation: "set",
+				data: {
+					query: { _id: response.data._id },
+					data: { setting: "ok" }
+				}
+			}
+			myMonguments.process(collection, req2, "RW", response2 => {
+				console.log(response);
+				console.log(response2);
+			})
+		})
+	});
 }
