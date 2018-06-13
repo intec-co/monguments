@@ -97,8 +97,8 @@ let collections = {
     closeTime: 0,
     exclusive: false,
     add: [],
-		set: [],
-		setHistory: true;//Todo
+    set: [],
+    setHistory: true;//Todo
     addClosed: [],//Todo
     setClosed: [],//Todo
     required: [],//Todo

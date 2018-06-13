@@ -1,3 +1,3 @@
-- restringir set para multiples documentos
 - projection para roles
-- _isLast: true para todos los documentos
+- permisos para set y write diferentes
+- permisos para set diferentes a los de la colleción por roles

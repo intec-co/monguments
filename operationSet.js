@@ -15,24 +15,23 @@ function write(coll, conf, request, opened, toClosed, callback) {
 		};
 		set._closed = true;
 		set._wClose = w;
-	}
-	if (opened) {
-		set = request.data.set;
-		for (let prop in request.data.set) {
-			var history = "_h" + prop;
-			push[history] = {
-				value: set[prop],
-				date: date,
-				id: request.user,
-				ips: request.ips
-			};
-
-		};
-	}
-	else {
-		conf.set.forEach(function (prop) {
-			if (request.data.set[prop] !== undefined) {
-				set[prop] = request.data.set[prop];
+	} else {
+		var properties;
+		if (opened) {
+			if (conf.set === "*")
+				properties = "*";
+			else if (Array.isArray(conf.set))
+				properties = conf.set;
+		}
+		else {
+			if (conf.setClosed === "*")
+				properties = "*";
+			else if (Array.isArray(conf.set))
+				properties = conf.setClosed;
+		}
+		if (properties === "*") {
+			set = request.data.set;
+			for (let prop in set) {
 				var history = "_h" + prop;
 				push[history] = {
 					value: set[prop],
@@ -40,8 +39,23 @@ function write(coll, conf, request, opened, toClosed, callback) {
 					id: request.user,
 					ips: request.ips
 				};
-			}
-		});
+
+			};
+		}
+		else if (Array.isArray(properties)) {
+			properties.forEach(function (prop) {
+				if (request.data.set[prop] !== undefined) {
+					set[prop] = request.data.set[prop];
+					var history = "_h" + prop;
+					push[history] = {
+						value: set[prop],
+						date: date,
+						id: request.user,
+						ips: request.ips
+					};
+				}
+			});
+		}
 	}
 	var update = {
 		$set: set,

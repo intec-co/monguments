@@ -19,7 +19,9 @@ module.exports = function (mongo, collection, request) {
 		if (param.lookup) {
 			var aggregation = [];
 			if (Array.isArray(param.lookup)) {
-				//aggregation
+				for (let collLookup of param.lookup) {
+					aggregation.push({ $lookup: collLookup });
+				}
 			} else
 				aggregation.push({ $lookup: param.lookup });
 			aggregation.push({ $match: query });
