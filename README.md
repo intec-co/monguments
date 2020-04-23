@@ -10,7 +10,7 @@ High traceability.
 
 ## Installation
 ```bash
-npm install  --save monguments
+npm install --save monguments
 ```
 
 ## Usage
