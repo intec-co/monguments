@@ -54,7 +54,15 @@ var response = {
     msg: ""
 }
 ~~~
-#### read & readList
+#### read && readList
+~~~javascript
+request = [
+  {
+    query: 'query',
+    set: 'set'
+  }
+]
+~~~
 #### write
 #### add
 #### set
@@ -65,6 +73,16 @@ var response = {
 #### write
 #### add
 #### set
+request = {
+  param:{
+    lookup:"check $lookup in mongodb documentation",
+    project: "check $project in mongodb documentation",
+    short: "",
+    skip: ""
+  },
+  data: 'query',
+}
+~~~
 #### close
 
 ## Configuration
@@ -83,6 +101,7 @@ Moguments add the following properties to documents:
 - _isLast: hidden documents with version.
 - _w: information about the user who write.
 - _closed: for documents that do not modify.
+- _wClosed: .
 - _"property"_h: property es the name in object, have the history of modifycation.
 
 ~~~javascript
@@ -107,6 +126,12 @@ let collections = {
         localField: '',
         foreignField: ''
       }
+    },
+    properties: {
+      isLast: "_isLast",
+      w: "_w",
+      closed:"_closed",
+      history:"_*_h"
     }
   }
 }
