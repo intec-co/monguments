@@ -55,13 +55,13 @@ class OperationAdd {
 	}
 
 	add(mongo: Link, collection: string, request: MgRequest, callback: MgCallback): void {
-		if (request.data && request.data.add && request.data.query) {
+		if (!request.data || !request.data.add || !request.data.query) {
 			callback(undefined, { error: 'data or query is undefined' });
 
 			return;
 		}
 		if (!checkData(request.data)) {
-			callback(undefined, { error: 'documento con propiedad no permitidad' });
+			callback(undefined, { error: 'documento con propiedad no permitida' });
 
 			return;
 		}
