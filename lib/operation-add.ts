@@ -28,17 +28,26 @@ class OperationAdd {
 		}
 		properties = (opened) ? conf.add : conf.addClosed;
 		if (properties) {
-			properties.forEach((prop: string) => {
-				if (request.data.add[prop] !== undefined) {
-					if (typeof request.data.add[prop] === 'object') {
+			if (properties === '*') {
+				const add = request.data.add;
+				for (const prop in add) {
+					if (add.hasOwnProperty(prop)) {
 						push[prop] = request.data.add[prop];
 						push[prop][p.w] = w;
-						console.log(push);
-					} else {
-						// ToDo no es objecto
 					}
 				}
-			});
+			} else if (Array.isArray(properties)) {
+				properties.forEach((prop: string) => {
+					if (request.data.add[prop] !== undefined) {
+						if (typeof request.data.add[prop] === 'object') {
+							push[prop] = request.data.add[prop];
+							push[prop][p.w] = w;
+						} else {
+							// ToDo no es objecto
+						}
+					}
+				});
+			}
 
 			update.$push = push;
 			coll.updateOne(request.data.query, update, { upsert: false }, (err) => {
