@@ -1,12 +1,12 @@
 {
 	"name": "monguments",
-	"version": "1.0.0-beta.4",
+	"version": "1.0.0-beta.5",
 	"description": "Manage documents in Mongo defining features",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {
 		"test": "node example.js",
-		"build": "tsc",
+		"build": "tsc --declaration",
 		"postversion": "git push",
 		"prepublish": "npm run build"
 	},
