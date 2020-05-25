@@ -95,7 +95,7 @@ class OperationWrite {
 				if (errInsert) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
 				} else {
-					callback(result);
+					callback(result.result);
 				}
 			});
 		});
@@ -130,7 +130,7 @@ class OperationWrite {
 					callback(undefined, { error: 'ha ocurrido un error' });
 				} else {
 					if (callback !== undefined) {
-						callback(result);
+						callback(result.result);
 					}
 				}
 			});
