@@ -32,8 +32,11 @@ class OperationAdd {
 				const add = request.data.add;
 				for (const prop in add) {
 					if (add.hasOwnProperty(prop)) {
+
 						push[prop] = request.data.add[prop];
-						push[prop][p.w] = w;
+						if (typeof push[prop] === "object") {
+							push[prop][p.w] = w;
+						}
 					}
 				}
 			} else if (Array.isArray(properties)) {
@@ -106,8 +109,11 @@ class OperationAdd {
 								} else {
 									opened = true;
 								}
+							} else {
+								// TODO to closed documets
 							}
 						}
+						// TODO verificar antes de mandar a cerrar
 						this.write(coll, conf, request, opened, toClosed, callback);
 
 						return;

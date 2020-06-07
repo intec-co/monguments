@@ -1,28 +1,29 @@
-import { write } from './operation-write';
 import { Link } from './db-link';
-import { MgRequest, MgCallback, MgResponse } from './interfaces';
+import { MgCallback, MgRequest, MgResponse } from './interfaces';
+import { write } from './operation-write';
 class DocsWrite {
-	private writeOne(mongo: Link, collection: string, request: MgRequest, res: Array<MgResponse>, idx: number, callback: MgCallback): void {
-		if (idx < request.data.length) {
-			const idColl = mongo.getCollectionId(collection);
-			write.write(mongo, collection, request, (response) => {
-				res.push(response);
-				this.writeOne(mongo, collection, request, res, idx + 1, callback);
+	private async writeAsync(mongo: Link, collection: string, request: MgRequest): Promise<any> {
+		return new Promise((resolve, reject) => {
+			write.write(mongo, collection, request, response => {
+				resolve(response);
 			});
-		} else {
-			callback(res);
-		}
+		});
 	}
 
-	public write(mongo: Link, collection: string, request: MgRequest, permissions: string, callback: MgCallback): void {
+	async write(mongo: Link, collection: string, request: MgRequest, permissions: string, callback: MgCallback) {
 		const collProperties = mongo.getCollectionProperties(collection);
 		if (collProperties) {
 			const owner = collProperties.owner;
 			const permission: string = permissions.charAt(1);
 			if (Array.isArray(request.data)) {
-				const res: Array<MgResponse> = [];
-				if (permission === 'W' || permission === 'C') {// ToDo verificar create
-					this.writeOne(mongo, collection, request, res, 0, callback);
+				if (permission === 'W' || permission === 'C') {
+					const res: Array<MgResponse> = [];
+					for (const doc of request.data) {
+						const oneReq = { ...request, data: doc };
+						const rst = await this.writeAsync(mongo, collection, oneReq);
+						res.push(rst);
+					}
+					callback(res, { error: 'Información guardada' });
 				} else {
 					callback(undefined, { error: 'No tiene permisos para esta operación' });
 				}
@@ -44,6 +45,8 @@ class DocsWrite {
 					callback(undefined, { error: 'No tiene permisos para esta operación' });
 				}
 			}
+		} else {
+			callback(undefined, { error: 'Colección no configurada' });
 		}
 	}
 }

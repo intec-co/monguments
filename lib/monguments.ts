@@ -2,7 +2,7 @@ import { AggregationCursor, Collection, Cursor, Db, MongoError } from 'mongodb';
 import { docProcess } from './docs-process';
 
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgRequest, MgRequestRead } from './interfaces';
+import { MgCallback, MgCollectionProperties, MgRequest, MgRequestRead, MgResponse, MgResult } from './interfaces';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { read } from './operation-read';
@@ -23,46 +23,52 @@ export class Monguments {
 		this._db = db;
 		this.collections = {};
 		this.link = new Link(db, collections);
+		// tslint:disable-next-line: forin
 		for (const coll in collections) {
-			if (collections.hasOwnProperty(coll)) {
-				if (!collections[coll].owner) {
-					collections[coll].owner = undefined;
-				}
-				if (!collections[coll].versionable) {
-					collections[coll].versionable = false;
-				}
-				if (!collections[coll].versionTime) {
-					collections[coll].versionTime = 0;
-				}
-				if (!collections[coll].closable) {
-					collections[coll].closable = false;
-				}
-				if (!collections[coll].closeTime) {
-					collections[coll].closeTime = 0;
-				}
-				if (!collections[coll].exclusive) {
-					collections[coll].exclusive = false;
-				}
-				if (!collections[coll].id) {
-					collections[coll].id = '_id';
-				}
-				if (!collections[coll].idAuto) {
-					collections[coll].idAuto = false;
-				}
-				if (!collections[coll].add) {
-					collections[coll].add = [];
-				}
-				if (!collections[coll].set) {
-					collections[coll].set = [];
-				}
-				if (!collections[coll].required) {
-					collections[coll].required = [];
-				}
-				if (collections[coll].versionable && collections[coll].id === '_id') {
-					console.error(`error: in db collection ${coll}, it's not allowed versionable with id "_id"`);
-				} else {
-					this.collections[coll] = JSON.parse(JSON.stringify(collections[coll]));
-				}
+			if (!collections[coll].owner) {
+				collections[coll].owner = undefined;
+			}
+			if (!collections[coll].versionable) {
+				collections[coll].versionable = false;
+			}
+			if (!collections[coll].versionTime) {
+				collections[coll].versionTime = 0;
+			}
+			if (!collections[coll].closable) {
+				collections[coll].closable = false;
+			}
+			if (!collections[coll].closeTime) {
+				collections[coll].closeTime = 0;
+			}
+			if (!collections[coll].exclusive) {
+				collections[coll].exclusive = false;
+			}
+			if (!collections[coll].id) {
+				collections[coll].id = '_id';
+			}
+			if (!collections[coll].idAuto) {
+				collections[coll].idAuto = false;
+			}
+			if (!collections[coll].add) {
+				collections[coll].add = [];
+			}
+			if (!collections[coll].set) {
+				collections[coll].set = [];
+			}
+			if (!collections[coll].required) {
+				collections[coll].required = [];
+			}
+			if (
+				collections[coll].versionable &&
+				collections[coll].id === '_id' &&
+				(!collections[coll].versionField ||
+					collections[coll].versionField === '_id' ||
+					collections[coll].versionField === ''
+				)
+			) {
+				console.error(`error: in db collection ${coll}, it's not allowed versionable with id "_id"`);
+			} else {
+				this.collections[coll] = JSON.parse(JSON.stringify(collections[coll]));
 			}
 		}
 	}
@@ -93,8 +99,24 @@ export class Monguments {
 					callback(doc);
 				});
 	}
-	process(collection: string, request: MgRequest, permissions: string, callback: MgCallback): void {
-		docProcess(this.link, collection, request, permissions, callback);
+
+	process(collection: string, request: MgRequest, permissions: string): Promise<MgResult>;
+	process(collection: string, request: MgRequest, permissions: string, callback: MgCallback): void;
+
+	// tslint:disable-next-line: promise-function-async
+	process(collection: string, request: MgRequest, permissions: string, callback?: MgCallback): Promise<MgResult> | void {
+		if (callback) {
+			docProcess(this.link, collection, request, permissions, callback);
+		} else {
+			return new Promise((resolve, reject) => {
+				docProcess(this.link, collection, request, permissions, (data, response) => {
+					resolve({
+						data,
+						response
+					});
+				});
+			});
+		}
 	}
 	read(collection: string, request: MgRequestRead, callback?: MgCallback): Cursor | AggregationCursor | undefined {
 		const cursor = read.read(this.link, collection, request);

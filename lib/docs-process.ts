@@ -1,11 +1,11 @@
+import { Link } from './db-link';
 import { docsRead } from './docs-read';
-import { docsWrite } from './docs-write';
 import { docsSet } from './docs-set';
+import { docsWrite } from './docs-write';
+import { hasPermission } from './has-permission';
+import { MgCallback, MgCollectionProperties, MgRequest } from './interfaces';
 import { add } from './operation-add';
 import { close } from './operation-close';
-import { hasPermission } from './has-permission';
-import { Link } from './db-link';
-import { MgResponse, MgCollectionProperties, MgRequest, MgCallback } from './interfaces';
 
 /**
  * @param request objecto con la información a procesar
@@ -16,14 +16,14 @@ import { MgResponse, MgCollectionProperties, MgRequest, MgCallback } from './int
  */
 
 const check = (link: Link, collection: string, request: MgRequest, permissions: string, callback: MgCallback): boolean => {
-	const msg = ' is undefined';
+	const msg = 'is undefined';
 	if (!request) {
-		callback(undefined, { error: 'request undefined' });
+		callback(undefined, { error: 'Request undefined' });
 
 		return false;
 	}
 	if (!permissions) {
-		callback(undefined, { error: `permissions ${msg}` });
+		callback(undefined, { error: `Permissions ${msg}` });
 
 		return false;
 	}
@@ -33,7 +33,7 @@ const check = (link: Link, collection: string, request: MgRequest, permissions: 
 		return false;
 	}
 	if (!collection) {
-		callback(undefined, { error: `Collention ${msg}` });
+		callback(undefined, { error: `Collection ${msg}` });
 
 		return false;
 	}
@@ -116,6 +116,6 @@ export const docProcess =
 				}
 				break;
 			default:
-				break;
+				callback(undefined, { error: 'Operación no definida' });
 		}
 	};

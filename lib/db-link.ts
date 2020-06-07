@@ -1,4 +1,4 @@
-import { Db, Collection } from 'mongodb';
+import { Collection, Db } from 'mongodb';
 import { MgCollectionProperties } from './interfaces';
 
 export class Link {
@@ -16,9 +16,6 @@ export class Link {
 	}
 	collection(collection: string): Collection {
 		return this.db.collection(collection);
-	}
-	getCollectionsProperties(): any {
-		return this.collections;
 	}
 	getCollectionProperties(collection: string): MgCollectionProperties | undefined {
 		if (this.collections[collection]) {

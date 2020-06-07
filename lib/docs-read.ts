@@ -154,6 +154,8 @@ class DocsRead {
 			} else {
 				callback(undefined, { error: 'No tiene permisos para esta operación' });
 			}
+		} else {
+			callback(undefined, { error: 'Colección no configurada' });
 		}
 	}
 	readList(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {

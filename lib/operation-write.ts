@@ -1,6 +1,6 @@
 import { checkData } from './check-data';
 import { MgResponse, MgCollectionProperties, MgCallback, MgRequest, MgW } from './interfaces';
-import { Collection, MongoError, Db } from 'mongodb';
+import { Collection, MongoError, Db, Double } from 'mongodb';
 import { Link } from './db-link';
 
 class OperationWrite {
@@ -66,7 +66,7 @@ class OperationWrite {
 				}
 			});
 		if (data[p.w].user !== doc[p.w].user) {// ToDo cambiar a propieatario
-			this.newVersion(coll, conf, query, data, callback);
+			this.newVersion(coll, conf, query, data, doc, callback);
 		}
 		coll.replaceOne(query, data, { upsert: false }, (err, result) => {
 			if (err) {
@@ -82,23 +82,45 @@ class OperationWrite {
 	}
 	private newVersion(
 		coll: Collection, conf: MgCollectionProperties,
-		query: any, data: any, callback: (data: any, result?: MgResponse) => void
+		query: any, data: any, doc: any, callback: (data: any, result?: MgResponse) => void
 	): void {
 		const p = conf.properties;
 		query[p.isLast] = true;
 		data[p.isLast] = true;
-		coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, (err) => {
-			if (err) {
-				callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
-			}
-			coll.insertOne(data, (errInsert, result) => {
-				if (errInsert) {
-					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
-				} else {
-					callback(result.result);
+		if (conf.versionField) {
+			data[conf.id] = doc[conf.id];
+			const queryReplace: any = {};
+			queryReplace[conf.id] = doc[conf.id];
+			coll.replaceOne(query, data, (err) => {
+				if (err) {
+					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos rpl' });
 				}
+				else {
+					delete doc[conf.id];
+					doc[p.isLast] = false;
+					coll.insertOne(doc, (errInsert) => {
+						if (errInsert) {
+							callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
+						} else {
+							callback(undefined, { msg: 'Se han guardado los cambios' });
+						}
+					});
+				}
+			})
+		} else {
+			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, (err) => {
+				if (err) {
+					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
+				}
+				coll.insertOne(data, (errInsert, result) => {
+					if (errInsert) {
+						callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
+					} else {
+						callback(undefined, { msg: 'Se han guardado los cambios' });
+					}
+				});
 			});
-		});
+		}
 	}
 	private newDoc(db: Db, collection: string, conf: MgCollectionProperties, data: any, callback: MgCallback): void {
 		const p = conf.properties;
@@ -112,6 +134,9 @@ class OperationWrite {
 		if (conf.idAuto) {
 			this.getId(db.collection('counters'), collection, (err, doc) => {
 				data[idColl] = doc.value.seq;
+				if (conf.versionField) {
+					data[conf.versionField] = doc.value.seq;
+				}
 				coll.insertOne(data, (errInsert, result) => {
 					if (errInsert) {
 						callback(undefined, { error: 'errInsert' });
@@ -124,7 +149,10 @@ class OperationWrite {
 					}
 				});
 			});
-		} else if (data[idColl] !== undefined) {
+		} else if (data[idColl]) {
+			if (conf.versionField) {
+				data[conf.versionField] = data[idColl];
+			}
 			coll.insertOne(data, (error, result) => {
 				if (error) {
 					callback(undefined, { error: 'ha ocurrido un error' });
@@ -188,7 +216,7 @@ class OperationWrite {
 				return;
 			}
 			if (!checkData(request.data)) {
-				callback(undefined, { error: 'documento con propiedad no permitidad' });
+				callback(undefined, { error: 'documento con propiedad no permitida' });
 
 				return;
 			}
@@ -246,7 +274,7 @@ class OperationWrite {
 										this.updateVersion(coll, conf, query, data, doc, callback);
 										break;
 									case 'newVersion':
-										this.newVersion(coll, conf, query, data, callback);
+										this.newVersion(coll, conf, query, data, doc, callback);
 										break;
 									case 'close':
 										this.close(coll, conf, query, w, callback);

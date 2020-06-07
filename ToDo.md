@@ -1,6 +1,6 @@
 - projection para roles
 - permisos para set y write diferentes
 - permisos para set diferentes a los de la colleción por roles
-- optimizar link para populations o universidades
+- optimizar link con cache
 - permitir versionar con _id utilizar auxiliar obj usar lookup rapido
 - flujo de estados
