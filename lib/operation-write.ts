@@ -1,7 +1,7 @@
+import { Collection, Db, MongoError } from 'mongodb';
 import { checkData } from './check-data';
-import { MgResponse, MgCollectionProperties, MgCallback, MgRequest, MgW } from './interfaces';
-import { Collection, MongoError, Db, Double } from 'mongodb';
 import { Link } from './db-link';
+import { MgCallback, MgCollectionProperties, MgRequest, MgResponse, MgW } from './interfaces';
 
 class OperationWrite {
 	private getId(counters: Collection, collection: string, callback: (err: MongoError, data: any) => void): void {
@@ -91,14 +91,13 @@ class OperationWrite {
 			data[conf.id] = doc[conf.id];
 			const queryReplace: any = {};
 			queryReplace[conf.id] = doc[conf.id];
-			coll.replaceOne(query, data, (err) => {
+			coll.replaceOne(query, data, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos rpl' });
-				}
-				else {
+				} else {
 					delete doc[conf.id];
 					doc[p.isLast] = false;
-					coll.insertOne(doc, (errInsert) => {
+					coll.insertOne(doc, errInsert => {
 						if (errInsert) {
 							callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
 						} else {
@@ -106,9 +105,9 @@ class OperationWrite {
 						}
 					});
 				}
-			})
+			});
 		} else {
-			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, (err) => {
+			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
 				}
@@ -192,7 +191,7 @@ class OperationWrite {
 		const p = conf.properties;
 		const set: any = { _wClose: w };
 		set[p.closed] = true;
-		coll.updateOne(query, { $set: set }, { upsert: false }, (err) => {
+		coll.updateOne(query, { $set: set }, { upsert: false }, err => {
 			if (err) {
 				callback(undefined, { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' });
 			} else {
@@ -283,7 +282,6 @@ class OperationWrite {
 										callback(undefined, { error: 'write unfair' });
 										break;
 									default:
-										break;
 								}
 							} else if (!conf.idAuto) {
 								this.newDoc(mongo.db, collection, conf, data, callback);
@@ -291,7 +289,6 @@ class OperationWrite {
 						});
 					break;
 				default:
-					break;
 			}
 		}
 	}

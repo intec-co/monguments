@@ -14,6 +14,7 @@ class DocsWrite {
 		const collProperties = mongo.getCollectionProperties(collection);
 		if (collProperties) {
 			const owner = collProperties.owner;
+			// TODO write exclusive
 			const permission: string = permissions.charAt(1);
 			if (Array.isArray(request.data)) {
 				if (permission === 'W' || permission === 'C') {

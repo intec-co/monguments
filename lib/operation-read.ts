@@ -1,37 +1,8 @@
 import { AggregationCursor, Cursor } from 'mongodb';
 import { Link } from './db-link';
-import { MgRequestRead, MGParamsRead } from './interfaces';
+import { MGParamsRead, MgRequestRead } from './interfaces';
 
 class OperationRead {
-	read = (mongo: Link, collection: string, request: MgRequestRead): Cursor | AggregationCursor => {
-		const query = request.data;
-		let params = request.params;
-		const conf = mongo.getCollectionProperties(collection);
-		if (conf) {
-			const p = conf.properties;
-			if (conf.versionable && query[p.isLast] === undefined) {
-				query[p.isLast] = true;
-			}
-			if (conf.id !== '_id') {
-				if (!params) {
-					params = { project: {} };
-				} else if (params.project === undefined) {
-					params.project = {};
-				}
-				if (params.project._id === undefined) { params.project._id = 0; }
-			}
-		}
-		if (params) {
-			if (params.lookup) {
-				return this.readAggregation(mongo, collection, query, params);
-			}
-
-			return this.readDirect(mongo, collection, query, params);
-		}
-
-		return mongo.collection(collection)
-			.find(query);
-	};
 	private readAggregation(mongo: Link, collection: string, query: any, params: MGParamsRead): AggregationCursor {
 		const aggregation = [];
 		aggregation.push({ $match: query });
@@ -76,6 +47,35 @@ class OperationRead {
 
 		return cursor;
 	}
+	read = (mongo: Link, collection: string, request: MgRequestRead): Cursor | AggregationCursor => {
+		const query = request.data;
+		let params = request.params;
+		const conf = mongo.getCollectionProperties(collection);
+		if (conf) {
+			const p = conf.properties;
+			if (conf.versionable && query[p.isLast] === undefined) {
+				query[p.isLast] = true;
+			}
+			if (conf.id !== '_id') {
+				if (!params) {
+					params = { project: {} };
+				} else if (params.project === undefined) {
+					params.project = {};
+				}
+				if (params.project._id === undefined) { params.project._id = 0; }
+			}
+		}
+		if (params) {
+			if (params.lookup) {
+				return this.readAggregation(mongo, collection, query, params);
+			}
+
+			return this.readDirect(mongo, collection, query, params);
+		}
+
+		return mongo.collection(collection)
+			.find(query);
+	};
 }
 
 export const read = new OperationRead();

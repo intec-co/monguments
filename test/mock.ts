@@ -1,7 +1,7 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import { Monguments } from "../lib/monguments"
 import { MongoClient } from 'mongodb';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MgCollectionProperties } from '../lib/interfaces';
+import { Monguments } from '../lib/monguments';
 import { collsConf } from './collections';
 
 export class MongumentsMock {
@@ -10,6 +10,7 @@ export class MongumentsMock {
 	collections: { [key: string]: MgCollectionProperties };
 	async newMg(collections?: { [key: string]: MgCollectionProperties }): Promise<Monguments> {
 		this.collections = collections ? collections : collsConf;
+
 		return new Promise(async (resolve, reject) => {
 			this.mongoServer = new MongoMemoryServer();
 			const mongoUri = await this.mongoServer.getConnectionString();
@@ -23,11 +24,13 @@ export class MongumentsMock {
 			resolve(new Monguments(db, this.collections));
 		});
 	}
-	getCollections() {
+	getCollections(): { [key: string]: MgCollectionProperties } {
 		return this.collections;
 	}
-	close() {
-		this.connection.close();
-		this.mongoServer.stop();
+	async close(): Promise<any> {
+		return Promise.all([
+			this.connection.close(),
+			this.mongoServer.stop()
+		]);
 	}
 }

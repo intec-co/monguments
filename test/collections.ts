@@ -133,35 +133,13 @@ export const collsConf: { [key: string]: MgCollectionProperties } = {
 		versionField: 'id',
 		closable: false,
 		closeTime: 5,
+		id: '_id',
+		idAuto: true,
 		exclusive: true,
-		id: '_id',
-		idAuto: true,
-		add: [],
-		set: [],
 		owner: '_id',
-		link: {
-		},
-		properties:
-		{
-			isLast: '_isLast',
-			w: '_w',
-			closed: '_closed',
-			history: '_h_*',
-			date: '_date'
-		}
-
-	},
-	requiere: {
-		versionable: false,
-		versionTime: 5,
-		versionField: 'id',
-		closable: false,
-		closeTime: 5,
-		id: '_id',
-		idAuto: true,
 		required: [
-			'field1',
-			'field2'
+			'value',
+			'list'
 		],
 		properties:
 		{

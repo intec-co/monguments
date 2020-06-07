@@ -1,7 +1,7 @@
-import { checkData } from './check-data';
 import { Collection, MongoError } from 'mongodb';
-import { MgCollectionProperties, MgRequest, MgCallback } from './interfaces';
+import { checkData } from './check-data';
 import { Link } from './db-link';
+import { MgCallback, MgCollectionProperties, MgRequest } from './interfaces';
 
 class OperationAdd {
 	private write(
@@ -34,7 +34,7 @@ class OperationAdd {
 					if (add.hasOwnProperty(prop)) {
 
 						push[prop] = request.data.add[prop];
-						if (typeof push[prop] === "object") {
+						if (typeof push[prop] === 'object') {
 							push[prop][p.w] = w;
 						}
 					}
@@ -46,14 +46,14 @@ class OperationAdd {
 							push[prop] = request.data.add[prop];
 							push[prop][p.w] = w;
 						} else {
-							// ToDo no es objecto
+							push[prop] = request.data.add[prop];
 						}
 					}
 				});
 			}
 
 			update.$push = push;
-			coll.updateOne(request.data.query, update, { upsert: false }, (err) => {
+			coll.updateOne(request.data.query, update, { upsert: false }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.add document' });
 				} else {

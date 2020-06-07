@@ -120,12 +120,10 @@ export class Monguments {
 	}
 	read(collection: string, request: MgRequestRead, callback?: MgCallback): Cursor | AggregationCursor | undefined {
 		const cursor = read.read(this.link, collection, request);
-		if (cursor) {
-			if (callback) {
-				cursor.next((err: any, doc: any) => {
-					callback(doc);
-				});
-			}
+		if (callback) {
+			cursor.next((err: any, doc: any) => {
+				callback(doc);
+			});
 		}
 
 		return cursor;

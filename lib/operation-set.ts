@@ -1,7 +1,7 @@
-import { checkData } from './check-data';
 import { Collection } from 'mongodb';
-import { MgCallback, MgRequest, MgCollectionProperties } from './interfaces';
+import { checkData } from './check-data';
 import { Link } from './db-link';
+import { MgCallback, MgCollectionProperties, MgRequest } from './interfaces';
 export class OperationSet {
 	private write(
 		coll: Collection, conf: MgCollectionProperties, request: MgRequest,
@@ -26,7 +26,7 @@ export class OperationSet {
 				}
 			}
 		} else if (Array.isArray(properties)) {
-			properties.forEach((prop) => {
+			properties.forEach(prop => {
 				if (request.data.set[prop]) {
 					set[prop] = request.data.set[prop];
 					const history = p.history.replace('*', prop);
@@ -53,7 +53,7 @@ export class OperationSet {
 				$set: set,
 				$push: push
 			};
-			coll.updateOne(request.data.query, update, { upsert: false }, (err) => {
+			coll.updateOne(request.data.query, update, { upsert: false }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.set document' });
 				} else {
@@ -72,7 +72,7 @@ export class OperationSet {
 			return;
 		}
 		if (!checkData(request.data.set)) {
-			callback(undefined, { error: 'documento con propiedad no permitidad' });
+			callback(undefined, { error: 'documento con propiedad no permitida' });
 
 			return;
 		}
@@ -89,7 +89,7 @@ export class OperationSet {
 							return;
 						}
 						if (!doc) {
-							callback(undefined, { error: 'error en mongo.set, no se encontro el documento' });
+							callback(undefined, { error: 'error en mongo.set, no se encontró el documento' });
 
 							return;
 						}
