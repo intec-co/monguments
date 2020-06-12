@@ -22,7 +22,7 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 	};
 
 	let done: (mg: Monguments) => void;
-	let promise: Promise<Monguments> = new Promise((resolve, reject) => {
+	const promise: Promise<Monguments> = new Promise((resolve, reject) => {
 		done = resolve;
 	});
 	if (callback) {

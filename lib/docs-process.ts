@@ -80,6 +80,8 @@ export const docProcess =
 					} else {
 						callback(undefined, { error: 'No tiene permisos para esta operación' });
 					}
+				} else {
+					callback(undefined, { error: `La colección: ${collection} no esta configurada` });
 				}
 				break;
 			case 'read':
@@ -101,6 +103,8 @@ export const docProcess =
 					} else {
 						callback(undefined, { error: 'No tiene permisos para esta operación' });
 					}
+				} else {
+					callback(undefined, { error: `La colección: ${collection} no esta configurada` });
 				}
 				break;
 			case 'close':
@@ -113,6 +117,8 @@ export const docProcess =
 					} else {
 						callback(undefined, { error: 'No tiene permisos para esta operación' });
 					}
+				} else {
+					callback(undefined, { error: `La colección: ${collection} no esta configurada` });
 				}
 				break;
 			default:

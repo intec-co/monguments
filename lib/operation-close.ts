@@ -1,5 +1,5 @@
 import { Link } from './db-link';
-import { MgRequest, MgCallback } from './interfaces';
+import { MgCallback, MgRequest } from './interfaces';
 
 export const close = (mongo: Link, collection: string, request: MgRequest, callback: MgCallback) => {
 	const conf = mongo.getCollectionProperties(collection);
@@ -38,7 +38,7 @@ export const close = (mongo: Link, collection: string, request: MgRequest, callb
 						}
 						const set: any = { _wClose: w };
 						set[p.closed] = true;
-						coll.updateOne(query, { $set: set }, { upsert: false }, (errUpdate) => {
+						coll.updateOne(query, { $set: set }, { upsert: false }, errUpdate => {
 							if (errUpdate) {
 								callback(undefined, { error: 'ha ocurrido un error', msg: 'error cerrando el documento a cerrar' });
 							} else {
@@ -52,5 +52,7 @@ export const close = (mongo: Link, collection: string, request: MgRequest, callb
 		} else {
 			callback(undefined, { error: 'la colección no es cerrable' });
 		}
+	} else {
+		callback(undefined, { error: 'Colección no configurada' });
 	}
 };

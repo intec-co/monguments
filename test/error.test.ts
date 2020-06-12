@@ -96,8 +96,10 @@ describe('Error test', () => {
 		};
 		const rst1 = await mg.process('basic', req1, 'RW_');
 		const rst2 = await mg.process('closable2', req1, 'RW_');
+		const rst3 = await mg.process('closable2x', req1, 'RW_');
 		expect(rst1.response.error).toBe('la colección no es cerrable');
 		expect(rst2.response.error).toBe('no se encontro el documento a cerrar');
+		expect(rst3.response.error).toBe('La colección: closable2x no esta configurada');
 	});
 	it('Read document fails', async () => {
 		const req1: MgRequest = {
@@ -138,14 +140,38 @@ describe('Error test', () => {
 		expect(consoleOutput[0]).toBe(`error: in db collection basic, it's not allowed versionable with id "_id"`);
 	});
 	it('Error with set', async () => {
-		const req1 = {
+		const req1: any = {
 			data: { query: { _id: 1 }, set: { field: 1 } },
 			operation: 'set',
 			user: 2
 		};
 		const rst1 = await mg.process('basic', req1, '___');
 		const rst2 = await mg.process('basic', req1, '_w_');
+		const rst3 = await mg.process('basic3', req1, '_w_');
+		const rst4 = await mg.process('versionable2', req1, '_w_');
 		expect(rst1.response.error).toBe('No tiene permisos para esta operación');
 		expect(rst2.response.error).toBe('No tiene permisos para esta operación');
+		expect(rst3.response.error).toBe('Colección no configurada');
+		expect(rst4.response.error).toBe('No tiene permisos para esta operación');
+	});
+	it('read docs', async () => {
+		const req1: MgRequest = {
+			operation: 'read',
+			data: { _id: 'xxx' },
+			user: 1
+		};
+		const rst1 = await mg.process('collx', req1, 'RW_');
+		const rst2 = await mg.process('basic', req1, '___');
+		const rst3 = await mg.process('basic', req1, 'RW_');
+		req1.operation = 'readList';
+		const rst4 = await mg.process('collx', req1, 'RW_');
+		const rst5 = await mg.process('basic', req1, '___');
+		const rst6 = await mg.process('basic', req1, 'RW_');
+		expect(rst1.response.error).toBe('Colección no configurada');
+		expect(rst2.response.error).toBe('No tiene permisos para esta operación');
+		expect(rst3.response.msg).toBe('No se encontraron documentos');
+		expect(rst4.response.error).toBe('Colección no configurada');
+		expect(rst5.response.error).toBe('No tiene permisos para esta operación');
+		expect(rst6.response.msg).toBe('No se encontraron documentos');
 	});
 });

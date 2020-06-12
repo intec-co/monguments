@@ -94,7 +94,7 @@ export class OperationSet {
 							return;
 						}
 						if (conf.exclusive) {
-							if (doc.w.id !== request.user) {
+							if (doc[p.w].id !== request.user) {
 								callback(undefined, { error: 'Usuario no es propietario del documento' });
 
 								return;

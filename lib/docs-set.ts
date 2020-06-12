@@ -4,7 +4,7 @@ import { read } from './operation-read';
 import { set } from './operation-set';
 
 class DocsSet {
-	private async  setOne(mongo: Link, request: MgRequest, permission: string, collection: string): Promise<MgResult> {
+	private async setOne(mongo: Link, request: MgRequest, permission: string, collection: string): Promise<MgResult> {
 		return new Promise((resolve, reject) => {
 			if (permission === 'W' || permission === 'w' || permission === 's') {
 				if (permission === 'w' || permission === 's') {
@@ -19,6 +19,11 @@ class DocsSet {
 
 							return;
 						}
+					} else {
+						resolve({
+							data: undefined,
+							response: { error: 'Colección no configurada' }
+						});
 					}
 				}
 				read.read(mongo, collection, { data: request.data.query })

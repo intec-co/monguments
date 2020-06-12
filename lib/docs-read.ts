@@ -185,6 +185,8 @@ class DocsRead {
 			} else {
 				callback(undefined, { error: 'No tiene permisos para esta operación' });
 			}
+		} else {
+			callback(undefined, { error: 'Colección no configurada' });
 		}
 	}
 }

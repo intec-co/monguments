@@ -1,17 +1,17 @@
 import { Collection, Db } from 'mongodb';
-import { MgCollectionProperties } from './interfaces';
+import { MgCollectionProperties, MgCollections } from './interfaces';
 
 export class Link {
 	private readonly _db: Db;
-	private readonly _collections: any;
-	constructor(db: Db, collections: any) {
+	private readonly _collections: MgCollections;
+	constructor(db: Db, collections: MgCollections) {
 		this._db = db;
 		this._collections = collections;
 	}
 	get db(): Db {
 		return this._db;
 	}
-	get collections(): any {
+	get collections(): MgCollections {
 		return this._collections;
 	}
 	collection(collection: string): Collection {

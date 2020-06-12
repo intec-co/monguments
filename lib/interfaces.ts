@@ -14,8 +14,8 @@ export class MgProperties {
 }
 
 export interface MgCollectionProperties {
-	add?: Array<string> | "*";
-	addClosed?: Array<string> | "*";
+	add?: Array<string> | '*';
+	addClosed?: Array<string> | '*';
 	closable?: boolean;
 	closeTime?: number;
 	exclusive?: boolean;
@@ -25,12 +25,14 @@ export interface MgCollectionProperties {
 	owner?: string;
 	properties: MgNameDocProperties;
 	required?: Array<string>;
-	set?: Array<string> | "*";
-	setClosed?: Array<string> | "*";
+	set?: Array<string> | '*';
+	setClosed?: Array<string> | '*';
 	versionable?: boolean;
 	versionTime?: number;
 	versionField?: string;
 }
+
+export interface MgCollections { [key: string]: MgCollectionProperties; }
 
 export interface MgNameDocProperties {
 	closed: string;

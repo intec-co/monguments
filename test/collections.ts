@@ -1,6 +1,6 @@
-import { MgCollectionProperties } from '../lib/interfaces';
+import { MgCollections } from '../lib/interfaces';
 
-export const collsConf: { [key: string]: MgCollectionProperties } = {
+export const collsConf: MgCollections = {
 	basic: {
 		versionable: false,
 		versionTime: 0,
@@ -110,7 +110,7 @@ export const collsConf: { [key: string]: MgCollectionProperties } = {
 		versionField: 'id',
 		closable: true,
 		closeTime: 5,
-		exclusive: false,
+		exclusive: true,
 		id: '_id',
 		idAuto: true,
 		addClosed: '*',

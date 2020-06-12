@@ -87,7 +87,7 @@ describe('write documents', () => {
 				content: 'data',
 			},
 			operation: 'write',
-			user: 0,
+			user: 1,
 		};
 		mg.write(coll, req1, async data1 => {
 			const req2: MgRequest = {
@@ -96,7 +96,7 @@ describe('write documents', () => {
 					content: 'edited'
 				},
 				operation: 'write',
-				user: 0,
+				user: 1,
 			};
 			await mg.process(coll, req2, 'RW_');
 			const req3: MgRequest = {
@@ -104,7 +104,7 @@ describe('write documents', () => {
 					_id: data1._id
 				},
 				operation: 'read',
-				user: 0,
+				user: 1,
 			};
 			const version = await mg.db.collection(coll).findOne({ id: data1._id, _isLast: false });
 			mg.read(coll, req3, (data2: any) => {
@@ -202,7 +202,7 @@ describe('write documents', () => {
 				{ content }
 			],
 			operation: 'write',
-			user: 0,
+			user: 1,
 		};
 		const rst1 = await mg.process(coll2, req1, 'RW_');
 		const req2: MgRequest = {
@@ -211,7 +211,7 @@ describe('write documents', () => {
 				set: { setter: 'setValue' }
 			},
 			operation: 'set',
-			user: 0
+			user: 2
 		};
 		await mg.process(coll2, req2, 'RW_');
 		const req3: MgRequest = {
@@ -221,7 +221,7 @@ describe('write documents', () => {
 			}
 			],
 			operation: 'set',
-			user: 0
+			user: 1
 		};
 		await mg.process(coll2, req3, 'RW_');
 		const doc1 = await mg.db.collection(coll2).find({ content }).toArray();
@@ -602,12 +602,18 @@ describe('write documents', () => {
 			user: 0
 		};
 		await mg.process('basic', req1, 'RW_');
+		await mg.process('versionable2', req1, 'RW_');
 		const req2: MgRequest = {
 			data: {},
 			operation: 'count',
 			user: 0
 		};
-		const rst = await mg.process('basic', req2, 'RW_');
-		expect(rst.data).toBeGreaterThan(0);
+		const rst1 = await mg.process('basic', req2, 'RW_');
+		const rst2 = await mg.process('versionable2', req2, 'RW_');
+		req2.data = { count: 0 };
+		const rst3 = await mg.process('versionable2', req2, 'RW_');
+		expect(rst1.data).toBeGreaterThan(0);
+		expect(rst2.data).toBeGreaterThan(0);
+		expect(rst3.data).toBe(0);
 	});
 });

@@ -2,7 +2,7 @@ import { AggregationCursor, Collection, Cursor, Db, MongoError } from 'mongodb';
 import { docProcess } from './docs-process';
 
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgRequest, MgRequestRead, MgResponse, MgResult } from './interfaces';
+import { MgCallback, MgCollectionProperties, MgCollections, MgRequest, MgRequestRead, MgResult } from './interfaces';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { read } from './operation-read';
@@ -10,16 +10,16 @@ import { set } from './operation-set';
 import { write } from './operation-write';
 
 export class Monguments {
-	get collectionsProperties(): any {
+	get collectionsProperties(): MgCollections {
 		return this.collections;
 	}
 	get db(): Db {
 		return this._db;
 	}
 	private readonly _db: Db;
-	private readonly collections: any;
+	private readonly collections: MgCollections;
 	private readonly link: Link;
-	constructor(db: Db, collections: any) {
+	constructor(db: Db, collections: MgCollections) {
 		this._db = db;
 		this.collections = {};
 		this.link = new Link(db, collections);
