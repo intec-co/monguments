@@ -47,9 +47,7 @@ class DocsRead {
 											query = JSON.parse(query);
 										} catch (e) {
 											console.error('catch in parse link query');
-											console.error(linkQuery);
-											console.error(query);
-											console.error(e);
+											break;
 										}
 									} else {
 										query = {};
@@ -100,9 +98,7 @@ class DocsRead {
 									query = JSON.parse(query);
 								} catch (e) {
 									console.error('catch in parse link query');
-									console.error(linkQuery);
-									console.error(query);
-									console.error(e);
+									break;
 								}
 							} else {
 								query = {};

@@ -115,6 +115,8 @@ export const collsConf: MgCollections = {
 		idAuto: true,
 		addClosed: '*',
 		setClosed: '*',
+		set: '*',
+		add: '*',
 		owner: '_id',
 		link: {
 		},

@@ -1,5 +1,6 @@
 import { Link } from '../lib/db-link';
 import { docProcess } from '../lib/docs-process';
+import { docsWrite } from '../lib/docs-write';
 import { MgRequest } from '../lib/interfaces';
 import { Monguments } from '../lib/monguments';
 import { close } from '../lib/operation-close';
@@ -82,5 +83,17 @@ describe('Error test', () => {
 		expect(rst1.error).toBe('Colección no configurada');
 		expect(rst2.error).toBe('error creado el query');
 		expect(rst4.error).toBe('no tiene permisos de cerrar el documento');
+	});
+
+	it('docs-write documents without data', done => {
+		const req1: MgRequest = {
+			data: undefined,
+			operation: 'write',
+			user: 0
+		};
+		docsWrite.write(link, 'basic', req1, 'RW_', (data, rst) => {
+			expect(rst.error).toBe('sin datos');
+			done();
+		});
 	});
 });

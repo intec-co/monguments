@@ -26,7 +26,7 @@ class DocsSet {
 						});
 					}
 				}
-				read.read(mongo, collection, { data: request.data.query })
+				mongo.db.collection(collection).find(request.data.query)
 					.toArray((err, array) => {
 						if (err) {
 							resolve({

@@ -1,7 +1,6 @@
 import { MgRequest } from '../lib/interfaces';
 import { Monguments } from '../lib/monguments';
 import { MongumentsMock } from './mock';
-import { read } from 'fs';
 
 let mgMock: MongumentsMock;
 let mg: Monguments;
@@ -30,6 +29,26 @@ describe('Error test', () => {
 		};
 		const rst = await mg.process('basic', req, 'RW_');
 		expect(rst.response.error).toBe('documento con propiedad no permitida');
+	});
+	it('write documents without permission', async () => {
+		const req1: MgRequest = {
+			data: {
+				value: 1
+			},
+			operation: 'write',
+			user: 0
+		};
+		const req2: MgRequest = {
+			data: [{
+				value: 1
+			}],
+			operation: 'write',
+			user: 0
+		};
+		const rst1 = await mg.process('basic', req1, 'R__');
+		const rst2 = await mg.process('basic', req2, 'R__');
+		expect(rst1.response.error).toBe('No tiene permisos para esta operación');
+		expect(rst2.response.error).toBe('No tiene permisos para esta operación');
 	});
 	it('collection not conf', async () => {
 		const req: MgRequest = {
@@ -173,5 +192,49 @@ describe('Error test', () => {
 		expect(rst4.response.error).toBe('Colección no configurada');
 		expect(rst5.response.error).toBe('No tiene permisos para esta operación');
 		expect(rst6.response.msg).toBe('No se encontraron documentos');
+	});
+	it('read link', async () => {
+		const req1: MgRequest = {
+			operation: 'write',
+			data: { content: 'req1' },
+			user: 2
+		};
+		const rst1 = await mg.process('versionable2', req1, 'RW_');
+		const req2: MgRequest = {
+			operation: 'read',
+			data: {
+				_id: rst1.data._id,
+				content: 'req2'
+			},
+			user: 2
+		};
+		await mg.process('basicIdManual', req2, 'RW_');
+		const req3: MgRequest = {
+			operation: 'read',
+			data: { _id: rst1.data._id },
+			params: {
+				link: [{
+					collection: 'basicIdManual',
+					from: '_id',
+					to: 'ver',
+					query: '{asdfa}}'
+				}]
+			},
+			user: 1
+		};
+		// const rst2 = await mg.process('versionable2', req3, 'RW_');
+		// expect(rst2.response.error).toBe('Colección no configurada');
+	});
+	xit('write coll id auto', async () => {
+		const req: MgRequest = {
+			operation: 'write',
+			data: {
+				_id: 1003,
+				content: 'content'
+			},
+			user: 1
+		};
+		// TODO const rst = await mg.process('versionable2', req, 'RW_');
+		// TODO expect(rst).toBe('');
 	});
 });

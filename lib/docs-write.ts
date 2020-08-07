@@ -29,7 +29,7 @@ class DocsWrite {
 					callback(undefined, { error: 'No tiene permisos para esta operación' });
 				}
 			} else {
-				if (!request.data === undefined) {
+				if (request.data === undefined) {
 					callback(undefined, { error: 'sin datos' });
 
 					return;

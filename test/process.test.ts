@@ -409,9 +409,9 @@ describe('write documents', () => {
 				]
 			},
 			operation: 'write',
-			user: 0,
+			user: 1,
 		};
-		await mg.process(coll1, req1, 'RW_');
+		const rst0 = await mg.process(coll1, req1, 'RW_');
 		const doc1 = await mg.db.collection(coll1).findOne({ _id: 101 });
 		const reqAdd1: MgRequest = {
 			data: {
@@ -419,7 +419,7 @@ describe('write documents', () => {
 				add: { list: 2 }
 			},
 			operation: 'add',
-			user: 0
+			user: 1
 		};
 		const reqSet1: MgRequest = {
 			data: {
@@ -427,7 +427,7 @@ describe('write documents', () => {
 				set: { value: 2 }
 			},
 			operation: 'set',
-			user: 0
+			user: 1
 		};
 		const rAdd1 = await mg.process(coll1, reqAdd1, 'RW_');
 		const rSet1 = await mg.process(coll1, reqSet1, 'RW_');
@@ -564,6 +564,98 @@ describe('write documents', () => {
 		});
 	});
 
+	// Set and add operations in closable collections
+	it('set in to close docs', async () => {
+		const coll = 'closable2';
+		const date = new Date().getTime() - (6 * 60000);
+		const req1: MgRequest = {
+			data: {
+				content: 'data',
+			},
+			operation: 'write',
+			user: 1,
+		};
+		const doc = {
+			_id: 1001,
+			content: 'data',
+			_date: date,
+			_w: {
+				id: 1,
+				date
+			}
+		};
+		await mg.db.collection(coll).insertOne(doc);
+		const rst2 = await mg.process(coll, req1, 'RW_');
+		const req2: MgRequest = {
+			data: {
+				query: { _id: rst2.data._id },
+				set: { content: 'setContent' }
+			},
+			operation: 'set',
+			user: 1
+		};
+		const req3 = {
+			data: {
+				query: { _id: 1001 },
+				set: { content: 'setContent' }
+			},
+			operation: 'set',
+			user: 1
+		};
+		await mg.process(coll, req2, 'RW_');
+		await mg.process(coll, req3, 'RW_');
+		const rst3 = await mg.db.collection(coll).findOne({ _id: 1001 });
+		const rst4 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
+		expect(rst3.content).toBe('setContent');
+		expect(rst3._closed).toBeTruthy();
+		expect(rst4.content).toBe('setContent');
+	});
+	it('add in to close docs', async () => {
+		const coll = 'closable2';
+		const date = new Date().getTime() - (6 * 60000);
+		const req1: MgRequest = {
+			data: {
+				content: [],
+			},
+			operation: 'write',
+			user: 1,
+		};
+		const doc = {
+			_id: 1002,
+			content: [],
+			_date: date,
+			_w: {
+				id: 1,
+				date
+			}
+		};
+		await mg.db.collection(coll).insertOne(doc);
+		const rst2 = await mg.process(coll, req1, 'RW_');
+		const req2: MgRequest = {
+			data: {
+				query: { _id: rst2.data._id },
+				add: { content: 'setContent' }
+			},
+			operation: 'add',
+			user: 1
+		};
+		const req3 = {
+			data: {
+				query: { _id: 1002 },
+				add: { content: 'setContent' }
+			},
+			operation: 'add',
+			user: 1
+		};
+		await mg.process(coll, req2, 'RW_');
+		await mg.process(coll, req3, 'RW_');
+		const rst3 = await mg.db.collection(coll).findOne({ _id: 1002 });
+		const rst4 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
+		// TODO expect(rst3.content[0]).toBe('setContent');
+		// TODO expect(rst3._closed).toBeTruthy();
+		expect(rst4.content[0]).toBe('setContent');
+	});
+
 	// Exclusive operations
 	it('Owner Operations', async () => {
 		const coll = 'exclusive';
@@ -586,6 +678,7 @@ describe('write documents', () => {
 			user: 1
 		};
 		const rst2 = await mg.process(coll, req2, 'RW_');
+		// TODO expect
 	});
 
 	// Others
