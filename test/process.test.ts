@@ -709,4 +709,34 @@ describe('write documents', () => {
 		expect(rst2.data).toBeGreaterThan(0);
 		expect(rst3.data).toBe(0);
 	});
+
+	it('Test Permission Create and Set', async () => {
+		const req1: MgRequest = {
+			data: { content: 'create-Set' },
+			operation: 'write',
+			user: 0
+		};
+		await mg.process('versionable2', req1, 'RC_');
+		req1.data._id = 1212;
+		await mg.process('closable1', req1, 'RC_');
+		const req2: MgRequest = {
+			data: {
+				query: { content: 'create-Set' },
+				set: {value: 'val'}
+			},
+			operation: 'set',
+			user: 0
+		};
+		await mg.process('versionable2', req2, 'RS_');
+		await mg.process('closable1', req2, 'RS_');
+		const req3: MgRequest = {
+			data: { content: 'create-Set' },
+			operation: 'read',
+			user: 0
+		};
+		const rst1 = await mg.process('versionable2', req3, 'RW_');
+		const rst2 = await mg.process('closable1', req3, 'RW_');
+		expect(rst1.data.value).toBe('val');
+		expect(rst2.data.value).toBe('val');
+	});
 });

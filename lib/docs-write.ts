@@ -40,7 +40,7 @@ class DocsWrite {
 					} else {
 						write.write(mongo, collection, request, callback);
 					}
-				} else if (permission === 'C' || permission === 'c') {
+				} else if (permission === 'C') {
 					write.write(mongo, collection, request, callback);
 				} else {
 					callback(undefined, { error: 'No tiene permisos para esta operación' });

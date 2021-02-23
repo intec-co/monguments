@@ -6,7 +6,7 @@ import { set } from './operation-set';
 class DocsSet {
 	private async setOne(mongo: Link, request: MgRequest, permission: string, collection: string): Promise<MgResult> {
 		return new Promise((resolve, reject) => {
-			if (permission === 'W' || permission === 'w' || permission === 's') {
+			if (permission === 'W' || permission === 'w' || permission === 's' || permission === 'S') {
 				if (permission === 'w' || permission === 's') {
 					const collProperties = mongo.getCollectionProperties(collection);
 					if (collProperties) {
@@ -24,6 +24,7 @@ class DocsSet {
 							data: undefined,
 							response: { error: 'Colección no configurada' }
 						});
+						return;
 					}
 				}
 				mongo.db.collection(collection).find(request.data.query)

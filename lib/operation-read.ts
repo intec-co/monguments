@@ -64,6 +64,9 @@ class OperationRead {
 				}
 				if (params.project._id === undefined) { params.project._id = 0; }
 			}
+		} else {
+			console.error(`No se encontró configuración para ${collection}`);
+
 		}
 		if (params) {
 			if (params.lookup) {
