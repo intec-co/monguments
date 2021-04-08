@@ -68,6 +68,7 @@ class OperationWrite {
 		if (data[p.w].user !== doc[p.w].user) {// ToDo cambiar a propieatario
 			this.newVersion(coll, conf, query, data, doc, callback);
 		}
+		data[conf.properties.isLast] = true;
 		coll.replaceOne(query, data, { upsert: false }, (err, result) => {
 			if (err) {
 				callback(undefined, { error: 'ha ocurrido un error', msg: 'operations update' });
