@@ -45,9 +45,10 @@ class DocsRead {
 										if (type === 'string') {
 											query = linkQuery.replace(/:from/, `:"${from}"`);
 											query = query.replace(/:"from"/, `:"${from}"`);
+										} else {
+											query = linkQuery.replace(/:from/, `:${from}`);
+											query = query.replace(/:"from"/, `:${from}`);
 										}
-										query = linkQuery.replace(/:from/, `:${from}`);
-										query = query.replace(/:"from"/, `:${from}`);
 										try {
 											query = JSON.parse(query);
 										} catch (e) {
@@ -101,9 +102,10 @@ class DocsRead {
 								if (type === 'string') {
 									query = linkQuery.replace(/:from/, `:"${from}"`);
 									query = query.replace(/:"from"/, `:"${from}"`);
+								} else {
+									query = linkQuery.replace(/:from/, `:${from}`);
+									query = query.replace(/:"from"/, `:${from}`);
 								}
-								query = linkQuery.replace(/:from/, `:${from}`);
-								query = query.replace(/:"from"/, `:${from}`);
 								try {
 									query = JSON.parse(query);
 								} catch (e) {
