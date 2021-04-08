@@ -41,6 +41,11 @@ class DocsRead {
 								if (from) {
 									let query: any;
 									if (linkQuery) {
+										const type = typeof from;
+										if (type === 'string') {
+											query = linkQuery.replace(/:from/, `:"${from}"`);
+											query = query.replace(/:"from"/, `:"${from}"`);
+										}
 										query = linkQuery.replace(/:from/, `:${from}`);
 										query = query.replace(/:"from"/, `:${from}`);
 										try {
