@@ -27,7 +27,7 @@ export class OperationSet {
 			}
 		} else if (Array.isArray(properties)) {
 			properties.forEach(prop => {
-				if (request.data.set[prop]) {
+				if (request.data.set[prop] !== undefined) {
 					set[prop] = request.data.set[prop];
 					const history = p.history.replace('*', prop);
 					push[history] = {
