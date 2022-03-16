@@ -74,6 +74,12 @@ export class MgConf {
 	user: string;
 	@IsString()
 	db: string;
+	@IsString()
+	@IsOptional()
+	ssl: string;
+	@IsString()
+	@IsOptional()
+	tls: string;
 }
 export interface MgRequest {
 	data: any;

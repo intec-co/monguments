@@ -12,8 +12,19 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 		mongoUrl += `${conf.user}:${conf.password}@`;
 	}
 	mongoUrl += `${conf.server}/${client.db}`;
+	const queryParams: string[] = [];
 	if (conf.replicaSet !== undefined) {
-		mongoUrl += `?replicaSet=${conf.replicaSet}`;
+		queryParams.push(`replicaSet=${conf.replicaSet}`);
+	}
+	if (conf.ssl !== undefined) {
+		queryParams.push(`ssl=${conf.ssl}`);
+	}
+	else if (conf.tls !== undefined) {
+		queryParams.push(`tls=${conf.tls}`);
+	}
+
+	if (queryParams.length > 0) {
+		mongoUrl += `?${queryParams.join('&')}`;
 	}
 
 	const params = {

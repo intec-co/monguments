@@ -1,4 +1,4 @@
-import { AggregationCursor, Collection, Cursor, Db, MongoError } from 'mongodb';
+import { AggregationCursor, Collection, Db, FindCursor, MongoError } from 'mongodb';
 import { docProcess } from './docs-process';
 
 import { Link } from './db-link';
@@ -94,7 +94,7 @@ export class Monguments {
 	getCounter(collection: string, callback: MgCallback): void {
 		this._db.collection('counters')
 			.findOneAndUpdate(
-				{ _id: collection }, { $inc: { seq: 1 } }, { upsert: true, returnOriginal: false },
+				{ _id: collection }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' },
 				(err: MongoError, doc: any) => {
 					callback(doc);
 				});
@@ -118,7 +118,7 @@ export class Monguments {
 			});
 		}
 	}
-	read(collection: string, request: MgRequestRead, callback?: MgCallback): Cursor | AggregationCursor | undefined {
+	read(collection: string, request: MgRequestRead, callback?: MgCallback): FindCursor | AggregationCursor | undefined {
 		const cursor = read.read(this.link, collection, request);
 		if (callback) {
 			cursor.next((err: any, doc: any) => {

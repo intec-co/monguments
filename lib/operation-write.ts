@@ -5,7 +5,7 @@ import { MgCallback, MgCollectionProperties, MgRequest, MgResponse, MgW } from '
 
 class OperationWrite {
 	private getId(counters: Collection, collection: string, callback: (err: MongoError, data: any) => void): void {
-		counters.findOneAndUpdate({ _id: collection }, { $inc: { seq: 1 } }, { returnOriginal: false, upsert: true }, callback);
+		counters.findOneAndUpdate({ _id: collection }, { $inc: { seq: 1 } }, { returnDocument: 'after', upsert: true }, callback);
 	}
 	private writeMode(conf: MgCollectionProperties, data: any, doc: any): string {
 		const p = conf.properties;
@@ -108,7 +108,7 @@ class OperationWrite {
 				}
 			});
 		} else {
-			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, err => {
+			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: true }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
 				}
@@ -192,7 +192,7 @@ class OperationWrite {
 		const p = conf.properties;
 		const set: any = { _wClose: w };
 		set[p.closed] = true;
-		coll.updateOne(query, { $set: set }, { upsert: false }, err => {
+		coll.updateOne(query, { $set: set }, { upsert: true }, err => {
 			if (err) {
 				callback(undefined, { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' });
 			} else {

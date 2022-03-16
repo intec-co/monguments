@@ -53,7 +53,7 @@ class OperationAdd {
 			}
 
 			update.$push = push;
-			coll.updateOne(request.data.query, update, { upsert: false }, err => {
+			coll.updateOne(request.data.query, update, { upsert: true }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.add document' });
 				} else {

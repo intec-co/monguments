@@ -27,20 +27,20 @@
 	},
 	"homepage": "https://github.com/intec-co/monguments#readme",
 	"dependencies": {
-		"class-validator": "^0.12.2",
-		"mongodb": "^3.6.0"
+		"class-validator": "^0.13.2",
+		"mongodb": "^4.3.1"
 	},
 	"devDependencies": {
-		"@types/chai": "^4.2.12",
-		"@types/jest": "^25.2.3",
-		"@types/mongodb": "^3.5.25",
-		"@types/node": "^13.13.15",
-		"chai": "^4.2.0",
-		"jest": "^26.2.2",
-		"mongodb-memory-server": "^6.6.3",
-		"ts-jest": "^26.1.4",
-		"tslint": "^6.1.3",
-		"typescript": "^3.9.7"
+		"@types/chai": "^4.2.22",
+		"@types/jest": "^27.0.3",
+		"@types/mongodb": "^4.0.7",
+		"@types/node": "^16.11.10",
+		"chai": "^4.3.4",
+		"eslint": "^8.3.0",
+		"jest": "^27.3.1",
+		"mongodb-memory-server": "^8.0.3",
+		"ts-jest": "^27.0.7",
+		"typescript": "^4.5.2"
 	},
 	"engines": {
 		"node": "^12.0.0"
