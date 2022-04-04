@@ -82,7 +82,7 @@ class OperationAdd {
 		if (conf) {
 			const p = conf.properties;
 			if (conf.closable) {
-				coll.find(request.query)
+				coll.find(request.data.query)
 					.next((err: MongoError, doc: any) => {
 						if (err) {
 							callback(undefined, { error: 'error en mongo.set' });
