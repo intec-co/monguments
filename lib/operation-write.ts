@@ -5,7 +5,7 @@ import { MgCallback, MgCollectionProperties, MgRequest, MgResponse, MgW } from '
 
 class OperationWrite {
 	private getId(counters: Collection, collection: string, callback: (err: MongoError, data: any) => void): void {
-		counters.findOneAndUpdate({ _id: collection }, { $inc: { seq: 1 } }, { returnOriginal: false, upsert: true }, callback);
+		counters.findOneAndUpdate({ _id: collection }, { $inc: { seq: 1 } }, { returnDocument: 'after', upsert: true }, callback);
 	}
 	private writeMode(conf: MgCollectionProperties, data: any, doc: any): string {
 		const p = conf.properties;
@@ -73,8 +73,8 @@ class OperationWrite {
 			if (err) {
 				callback(undefined, { error: 'ha ocurrido un error', msg: 'operations update' });
 			} else {
-				if (result.result.n > 0) {
-					callback({ data: result.result.n });
+				if (result.modifiedCount > 0) {
+					callback({ data: result.modifiedCount });
 				} else {
 					callback({ data: 0 });
 				}
@@ -108,7 +108,9 @@ class OperationWrite {
 				}
 			});
 		} else {
-			coll.updateMany(query, { $set: { [p.isLast]: false } }, { upsert: false }, err => {
+			const $set = {  }
+			$set[p.isLast]= false;
+			coll.updateMany(query, { $set  }, { upsert: false }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
 				}
@@ -158,7 +160,7 @@ class OperationWrite {
 					callback(undefined, { error: 'ha ocurrido un error' });
 				} else {
 					if (callback !== undefined) {
-						callback(result.result);
+						callback(result);
 					}
 				}
 			});
@@ -180,8 +182,8 @@ class OperationWrite {
 			if (err) {
 				callback(undefined, { error: 'ha ocurrido un error', msg: 'operations overwrite' });
 			} else {
-				if (result.result.n > 0) {
-					callback(result.result.n, { msg: 'Los datos fueron guardados' });
+				if (result.modifiedCount > 0) {
+					callback(result.modifiedCount, { msg: 'Los datos fueron guardados' });
 				} else {
 					callback(0, { msg: 'Los datos fueron guardados' });
 				}

@@ -1,4 +1,4 @@
-import { AggregationCursor, Cursor } from 'mongodb';
+import { AggregationCursor, FindCursor } from 'mongodb';
 import { Link } from './db-link';
 import { MGParamsRead, MgRequestRead } from './interfaces';
 
@@ -29,7 +29,7 @@ class OperationRead {
 		return mongo.collection(collection)
 			.aggregate(aggregation);
 	}
-	private readDirect(mongo: Link, collection: string, query: any, params): Cursor {
+	private readDirect(mongo: Link, collection: string, query: any, params): FindCursor {
 		const cursor = mongo.collection(collection)
 			.find(query);
 		if (params.sort !== undefined) {
@@ -47,7 +47,7 @@ class OperationRead {
 
 		return cursor;
 	}
-	read = (mongo: Link, collection: string, request: MgRequestRead): Cursor | AggregationCursor => {
+	read = (mongo: Link, collection: string, request: MgRequestRead): FindCursor | AggregationCursor => {
 		const query = request.data;
 		let params = request.params;
 		const conf = mongo.getCollectionProperties(collection);

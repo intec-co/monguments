@@ -17,25 +17,27 @@ afterAll(async () => {
 // Write operations
 describe('write documents', () => {
 
-	it('basic write doc', async done => {
+	it('basic write doc', async () => {
 		const req: MgRequest = {
 			data: { content: 'data' },
 			operation: 'write',
 			user: 0,
 		};
-		mg.process('basic', req, 'RW_', (data1, rst) => {
-			req.data = {
-				content: 'overwrite',
-				_id: data1._id
-			};
-			mg.process('basic', req, 'RW_', (data2, rst) => {
-				expect(data1._id).toBe(1);
-				done();
+		await new Promise((done) => {
+			mg.process('basic', req, 'RW_', (data1, rst) => {
+				req.data = {
+					content: 'overwrite',
+					_id: data1._id
+				};
+				mg.process('basic', req, 'RW_', (data2, rst) => {
+					expect(data1._id).toBe(1);
+					done(undefined);
+				});
 			});
 		});
 	});
 
-	it('versionable new version', async done => {
+	it('versionable new version', async () => {
 		const doc = {
 			id: 1,
 			_date: new Date().getTime() - 60000
@@ -50,10 +52,12 @@ describe('write documents', () => {
 		};
 		const coll = mg.db.collection('versionable1');
 		await coll.insertOne(doc);
-		mg.process('versionable1', req, 'RW_', async (data, rst) => {
-			const docLast = await coll.findOne({ id: 1, _isLast: true });
-			expect(docLast.content).toBe('data');
-			done();
+		await new Promise((done) => {
+			mg.process('versionable1', req, 'RW_', async (data, rst) => {
+				const docLast = await coll.findOne({ id: 1, _isLast: true });
+				expect(docLast!.content).toBe('data');
+				done(undefined);
+			});
 		});
 	});
 
@@ -75,12 +79,12 @@ describe('write documents', () => {
 		};
 		const rst2 = await mg.process(coll, req, 'RW_');
 		const doc = await mg.getCollection(coll).findOne({ id: 2 });
-		expect(doc.content).toBe(value);
+		expect(doc!.content).toBe(value);
 		expect(rst1).toBeDefined();
 		expect(rst2).toBeDefined();
 	});
 
-	it('versionable2 _id and id with direct access', async done => {
+	it('versionable2 _id and id with direct access', async () => {
 		const coll = 'versionable2';
 		const req1: MgRequest = {
 			data: {
@@ -107,16 +111,18 @@ describe('write documents', () => {
 				user: 1,
 			};
 			const version = await mg.db.collection(coll).findOne({ id: data1._id, _isLast: false });
-			mg.read(coll, req3, (data2: any) => {
-				expect(version.content).toBe('data');
-				expect(data2._id).toBe(data1._id);
-				expect(data2.content).toBe('edited');
-				done();
+			await new Promise((done) => {
+				mg.read(coll, req3, (data2: any) => {
+					expect(version!.content).toBe('data');
+					expect(data2._id).toBe(data1._id);
+					expect(data2.content).toBe('edited');
+					done(undefined);
+				});
 			});
 		});
 	});
 
-	it('closable close doc', async done => {
+	it('closable close doc', async () => {
 		const req: MgRequest = {
 			data: {
 				id: 1,
@@ -125,13 +131,15 @@ describe('write documents', () => {
 			operation: 'write',
 			user: 0,
 		};
-		mg.process('closable1', req, 'RW_', (data, rst) => {
-			req.data = {
-				content: 'edited',
-				id: 2
-			};
-			expect(rst).toBeDefined();
-			done();
+		await new Promise((done) => {
+			mg.process('closable1', req, 'RW_', (data, rst) => {
+				req.data = {
+					content: 'edited',
+					id: 2
+				};
+				expect(rst).toBeDefined();
+				done(undefined);
+			});
 		});
 	});
 	// Set operations
@@ -162,7 +170,7 @@ describe('write documents', () => {
 		const doc = await mg.process(coll, req3, 'RW_');
 		expect(doc.data.setValue).toBe('setValue');
 	});
-	it('Set direct to open document', async done => {
+	it('Set direct to open document', async () => {
 		const coll = 'versionable2';
 		const req1: MgRequest = {
 			data: {
@@ -180,16 +188,20 @@ describe('write documents', () => {
 			operation: 'set',
 			user: 0,
 		};
-		mg.set(coll, req2, async () => {
-			const req3: MgRequest = {
-				data: { _id: rst1.data._id },
-				operation: 'read',
-				user: 0,
-			};
-			const doc = await mg.process(coll, req3, 'RW_');
-			expect(doc.data.setValue).toBe('setValue');
-			expect(doc.data._h_setValue[0].value).toBe('setValue');
-			done();
+		await new Promise((resolve) => {
+
+			mg.set(coll, req2, async () => {
+				const req3: MgRequest = {
+					data: { _id: rst1.data._id },
+					operation: 'read',
+					user: 0,
+				};
+				const doc = await mg.process(coll, req3, 'RW_');
+				expect(doc.data.setValue).toBe('setValue');
+				expect(doc.data._h_setValue[0].value).toBe('setValue');
+				resolve(undefined);
+			});
+
 		});
 	});
 	it('set multi', async () => {
@@ -368,7 +380,7 @@ describe('write documents', () => {
 		expect(doc3.data._id).toBe(rst1.data[1]._id);
 	});
 	// Close Operation
-	it('Close docs', async done => {
+	it('Close docs', async () => {
 		const coll = 'closable2';
 		const req1: MgRequest = {
 			data: { data: 'toClose' },
@@ -390,15 +402,17 @@ describe('write documents', () => {
 		const doc1 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
 		await mg.process(coll, req3, 'RW_');
 		const doc2 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
-		mg.close(coll, req2, async () => {
-			const doc = await mg.db.collection(coll).findOne({ _id: rst1.data._id });
-			expect(doc1._closed).toBeFalsy();
-			expect(doc2._closed).toBeTruthy();
-			expect(doc._closed).toBeTruthy();
-			done();
+		await new Promise((resolve) => {
+			mg.close(coll, req2, async () => {
+				const doc = await mg.db.collection(coll).findOne({ _id: rst1.data._id });
+				expect(doc1!._closed).toBeFalsy();
+				expect(doc2!._closed).toBeTruthy();
+				expect(doc!._closed).toBeTruthy();
+				resolve(undefined);
+			});
 		});
 	});
-	it('Operation in close documents exp', async done => {
+	it('Operation in close documents exp', async () => {
 		const coll1 = 'closable1';
 		const req1: MgRequest = {
 			data: {
@@ -433,12 +447,11 @@ describe('write documents', () => {
 		const rSet1 = await mg.process(coll1, reqSet1, 'RW_');
 		const fDoc1 = await mg.db.collection(coll1).findOne({ _id: 101 });
 
-		expect(doc1._closed).toBeTruthy();
-		expect(fDoc1.list[1]).toBe(2);
-		expect(fDoc1.value).toBe(2);
-		done();
+		expect(doc1!._closed).toBeTruthy();
+		expect(fDoc1!.list[1]).toBe(2);
+		expect(fDoc1!.value).toBe(2);
 	});
-	it('Operation in close documents any', async done => {
+	it('Operation in close documents any', async () => {
 		const coll2 = 'closable2';
 		const req: MgRequest = {
 			data: {
@@ -478,15 +491,14 @@ describe('write documents', () => {
 		const rSet2 = await mg.process(coll2, reqSet2, 'RW_');
 		const fDoc2 = await mg.db.collection(coll2).findOne({ _id: rst2.data._id });
 
-		expect(doc2._closed).toBeFalsy();
-		expect(fDoc2.aList[0]).toBe(2);
-		expect(fDoc2.aValue).toBe(2);
-		done();
+		expect(doc2!._closed).toBeFalsy();
+		expect(fDoc2!.aList[0]).toBe(2);
+		expect(fDoc2!.aValue).toBe(2);
 	});
 	it('Auto Closed documents', async () => {
 		const coll2 = 'closable2';
 		const date = new Date().getTime() - 600000;
-		const doc = {
+		const doc: any = {
 			_id: 103,
 			data: 'toClose',
 			_date: date,
@@ -503,8 +515,8 @@ describe('write documents', () => {
 		};
 		await mg.process(coll2, req2, 'RW_');
 		const fDoc = await mg.db.collection(coll2).findOne({ _id: 103 });
-		expect(fDoc._closed).toBeTruthy();
-		expect(fDoc.data).toBe('toClose');
+		expect(fDoc!._closed).toBeTruthy();
+		expect(fDoc!.data).toBe('toClose');
 	});
 	// Add Operations
 	it('Add to open document', async () => {
@@ -534,7 +546,7 @@ describe('write documents', () => {
 		const doc = await mg.process(coll, req3, 'RW_');
 		expect(doc.data.addValue[0]).toBe('addValue');
 	});
-	it('Add to open document', async done => {
+	it('Add to open document', async () => {
 		const coll = 'versionable2';
 		const req1: MgRequest = {
 			data: {
@@ -552,15 +564,17 @@ describe('write documents', () => {
 			operation: 'add',
 			user: 0,
 		};
-		mg.add(coll, req2, async () => {
-			const req3: MgRequest = {
-				data: { _id: rst1.data._id },
-				operation: 'read',
-				user: 0,
-			};
-			const doc = await mg.process(coll, req3, 'RW_');
-			expect(doc.data.addValue[0]).toBe('addValue');
-			done();
+		await new Promise(resolve => {
+			mg.add(coll, req2, async () => {
+				const req3: MgRequest = {
+					data: { _id: rst1.data._id },
+					operation: 'read',
+					user: 0,
+				};
+				const doc = await mg.process(coll, req3, 'RW_');
+				expect(doc.data.addValue[0]).toBe('addValue');
+				resolve(undefined);
+			});
 		});
 	});
 
@@ -575,7 +589,7 @@ describe('write documents', () => {
 			operation: 'write',
 			user: 1,
 		};
-		const doc = {
+		const doc: any = {
 			_id: 1001,
 			content: 'data',
 			_date: date,
@@ -606,9 +620,9 @@ describe('write documents', () => {
 		await mg.process(coll, req3, 'RW_');
 		const rst3 = await mg.db.collection(coll).findOne({ _id: 1001 });
 		const rst4 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
-		expect(rst3.content).toBe('setContent');
-		expect(rst3._closed).toBeTruthy();
-		expect(rst4.content).toBe('setContent');
+		expect(rst3!.content).toBe('setContent');
+		expect(rst3!._closed).toBeTruthy();
+		expect(rst4!.content).toBe('setContent');
 	});
 	it('add in to close docs', async () => {
 		const coll = 'closable2';
@@ -620,7 +634,7 @@ describe('write documents', () => {
 			operation: 'write',
 			user: 1,
 		};
-		const doc = {
+		const doc: any = {
 			_id: 1002,
 			content: [],
 			_date: date,
@@ -653,7 +667,7 @@ describe('write documents', () => {
 		const rst4 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
 		// TODO expect(rst3.content[0]).toBe('setContent');
 		// TODO expect(rst3._closed).toBeTruthy();
-		expect(rst4.content[0]).toBe('setContent');
+		expect(rst4!.content[0]).toBe('setContent');
 	});
 
 	// Exclusive operations
@@ -722,7 +736,7 @@ describe('write documents', () => {
 		const req2: MgRequest = {
 			data: {
 				query: { content: 'create-Set' },
-				set: {value: 'val'}
+				set: { value: 'val' }
 			},
 			operation: 'set',
 			user: 0

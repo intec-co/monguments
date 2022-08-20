@@ -1,4 +1,4 @@
-import mongo, { MongoClient } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { MgClient, MgConf } from './interfaces';
 import { Monguments } from './monguments';
 
@@ -16,11 +16,6 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 		mongoUrl += `?replicaSet=${conf.replicaSet}`;
 	}
 
-	const params = {
-		useNewUrlParser: true,
-		useUnifiedTopology: true
-	};
-
 	let done: (mg: Monguments) => void;
 	const promise: Promise<Monguments> = new Promise((resolve, reject) => {
 		done = resolve;
@@ -28,9 +23,8 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 	if (callback) {
 		done = callback;
 	}
-
-	mongo.MongoClient.connect(mongoUrl, params,
-		(err: any, mongoClient: MongoClient) => {
+const mongodbClient = new MongoClient(mongoUrl);
+	mongodbClient.connect((err, mongoClient) => {
 			if (err) {
 				console.error(err);
 				if (callback) {
