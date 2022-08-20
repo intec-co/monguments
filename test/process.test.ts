@@ -618,7 +618,7 @@ describe('write documents', () => {
 		};
 		await mg.process(coll, req2, 'RW_');
 		await mg.process(coll, req3, 'RW_');
-		const rst3 = await mg.db.collection(coll).findOne({ _id: 1001 });
+		const rst3 = await mg.db.collection(coll).findOne({ _id: 1001});
 		const rst4 = await mg.db.collection(coll).findOne({ _id: rst2.data._id });
 		expect(rst3!.content).toBe('setContent');
 		expect(rst3!._closed).toBeTruthy();

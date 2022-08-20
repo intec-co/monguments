@@ -80,47 +80,50 @@ export class OperationSet {
 		const conf: MgCollectionProperties | undefined = mongo.getCollectionProperties(collection);
 		if (conf) {
 			const p = conf.properties;
+			const query = { ...request.data.query };
+			if (conf.versionable) {
+				query[p.isLast] = true;
+			}
 			if (conf.closable) {
-				coll.find(request.data.query)
-					.next((err, doc) => {
-						if (err) {
-							callback(undefined, { error: 'error en mongo.set' });
-
-							return;
-						}
-						if (!doc) {
-							callback(undefined, { error: 'error en mongo.set, no se encontró el documento' });
-
-							return;
-						}
-						if (conf.exclusive) {
-							if (doc[p.w].id !== request.user) {
-								callback(undefined, { error: 'Usuario no es propietario del documento' });
-
-								return;
-							}
-						}
-						let opened = false;
-						let toClosed = false;
-						if (conf.closable) {
-							if (!doc[p.closed]) {
-								if (conf.closeTime >= 0) {
-									const milli = new Date().getTime() - doc[p.date];
-									const min = milli / 60000;
-									if (conf.closeTime > min) {
-										opened = true;
-									} else {
-										toClosed = true;
-									}
-								} else {
-									opened = true;
-								}
-							}
-						}
-						this.write(coll, conf, request, opened, toClosed, callback);
+				coll.findOne(query, (err, doc) => {
+					if (err) {
+						callback(undefined, { error: 'error en mongo.set' });
 
 						return;
-					});
+					}
+					if (!doc) {
+						callback(undefined, { error: 'error en mongo.set, no se encontró el documento' });
+
+						return;
+					}
+					if (conf.exclusive) {
+						if (doc[p.w].id !== request.user) {
+							callback(undefined, { error: 'Usuario no es propietario del documento' });
+
+							return;
+						}
+					}
+					let opened = false;
+					let toClosed = false;
+					if (conf.closable) {
+						if (!doc[p.closed]) {
+							if (conf.closeTime >= 0) {
+								const milli = new Date().getTime() - doc[p.date];
+								const min = milli / 60000;
+								if (conf.closeTime > min) {
+									opened = true;
+								} else {
+									toClosed = true;
+								}
+							} else {
+								opened = true;
+							}
+						}
+					}
+					this.write(coll, conf, request, opened, toClosed, callback);
+
+					return;
+				});
 			} else {
 				this.write(coll, conf, request, true, false, callback);
 			}
