@@ -27,7 +27,7 @@
 	},
 	"homepage": "https://github.com/intec-co/monguments#readme",
 	"dependencies": {
-		"class-validator": "^0.13.2",
+		"class-validator": "^0.14.0",
 		"mongodb": "^4.9.0"
 	},
 	"devDependencies": {
