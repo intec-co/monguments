@@ -68,6 +68,15 @@ export class MgConf {
 	@IsOptional()
 	replicaSet?: string;
 	@IsString()
+	@IsOptional()
+	readPreference?: string;
+	@IsString()
+	@IsOptional()
+	readPreferenceTags?: string;
+	@IsString()
+	@IsOptional()
+	tls?: string;
+	@IsString()
 	server: string;
 	@IsString()
 	@IsOptional()

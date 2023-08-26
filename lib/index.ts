@@ -12,9 +12,18 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 		mongoUrl += `${conf.user}:${conf.password}@`;
 	}
 	mongoUrl += `${conf.server}/${client.db}`;
-	if (conf.replicaSet !== undefined) {
-		mongoUrl += `?replicaSet=${conf.replicaSet}`;
+	const urlParams = [];
+	if(conf.tls !== undefined){
+		urlParams.push(`tls=${conf.tls}`);
 	}
+	if (conf.replicaSet !== undefined) {
+		urlParams.push(`replicaSet=${conf.replicaSet}`);
+	}
+	if (conf.readPreference !== undefined) {
+		urlParams.push(`readPreference=${conf.readPreference}`);
+	}
+	const urlQueriesParams = urlParams.join('&');
+	mongoUrl += `?${urlQueriesParams}`;
 
 	let done: (mg: Monguments) => void;
 	const promise: Promise<Monguments> = new Promise((resolve, reject) => {
