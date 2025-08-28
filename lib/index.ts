@@ -13,7 +13,7 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 	}
 	mongoUrl += `${conf.server}/${client.db}`;
 	const urlParams = [];
-	if(conf.tls !== undefined){
+	if (conf.tls !== undefined) {
 		urlParams.push(`tls=${conf.tls}`);
 	}
 	if (conf.replicaSet !== undefined) {
@@ -32,18 +32,18 @@ export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Mon
 	if (callback) {
 		done = callback;
 	}
-const mongodbClient = new MongoClient(mongoUrl);
+	const mongodbClient = new MongoClient(mongoUrl);
 	mongodbClient.connect((err, mongoClient) => {
-			if (err) {
-				console.error(err);
-				if (callback) {
-					callback();
-				}
-				throw new Error('Could not connect to mongodb');
+		if (err) {
+			console.error(err);
+			if (callback) {
+				callback();
 			}
-			const db = mongoClient.db(client.db);
-			done(new Monguments(db, collections));
-		});
+			throw new Error('Could not connect to mongodb');
+		}
+		const db = mongoClient.db(client.db);
+		done(new Monguments(db, collections));
+	});
 	if (!callback) {
 		return promise;
 	}

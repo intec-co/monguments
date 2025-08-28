@@ -24,7 +24,7 @@ class OperationAdd {
 			update.$set = {
 				_wClose: w
 			};
-			update[p.closed] = true;
+			update.$set[p.closed] = true;
 		}
 		properties = (opened) ? conf.add : conf.addClosed;
 		if (properties) {
