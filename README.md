@@ -73,6 +73,7 @@ request = [
 #### write
 #### add
 #### set
+~~~javascript
 request = {
   param:{
     lookup:"check $lookup in mongodb documentation",
@@ -88,11 +89,8 @@ request = {
 ## Configuration
 ~~~javascript
 let conf = {
-  server: 'localhost',
-  database: 'test',
-  user: 'user',
-  password: 'pwd',
-  replicaSet: 'replicaSet',
+  uri: 'mongodb://localhost',
+  database: 'test'
 }
 ~~~
 

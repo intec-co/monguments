@@ -62,25 +62,7 @@ export interface MgResponse {
 }
 export class MgConf {
 	@IsString()
-	@IsOptional()
-	password: string;
-	@IsString()
-	@IsOptional()
-	replicaSet?: string;
-	@IsString()
-	@IsOptional()
-	readPreference?: string;
-	@IsString()
-	@IsOptional()
-	readPreferenceTags?: string;
-	@IsString()
-	@IsOptional()
-	tls?: string;
-	@IsString()
-	server: string;
-	@IsString()
-	@IsOptional()
-	user: string;
+	uri: string;
 	@IsString()
 	db: string;
 }

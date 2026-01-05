@@ -2,7 +2,14 @@ import { AggregationCursor, Collection, FindCursor, Db, MongoError } from 'mongo
 import { docProcess } from './docs-process';
 
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgCollections, MgRequest, MgRequestRead, MgResult } from './interfaces';
+import {
+	MgCallback,
+	MgCollectionProperties,
+	MgCollections,
+	MgRequest,
+	MgRequestRead,
+	MgResult
+} from './interfaces';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { read } from './operation-read';
