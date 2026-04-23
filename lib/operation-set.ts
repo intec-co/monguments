@@ -53,7 +53,8 @@ export class OperationSet {
 				$set: set,
 				$push: push
 			};
-			coll.updateOne(request.data.query, update, { upsert: false }, err => {
+			const upsert = conf.upsert;
+			coll.updateOne(request.data.query, update, { upsert }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.set document' });
 				} else {

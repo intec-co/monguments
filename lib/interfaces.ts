@@ -30,6 +30,7 @@ export interface MgCollectionProperties {
 	versionable?: boolean;
 	versionTime?: number;
 	versionField?: string;
+	upsert?: boolean;
 }
 
 export interface MgCollections { [key: string]: MgCollectionProperties; }
