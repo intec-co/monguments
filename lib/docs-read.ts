@@ -138,64 +138,78 @@ class DocsRead {
 	read(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
 		const permission = permissions.charAt(0);
 		const collectionConf = mongo.getCollectionProperties(collection);
-		if (collectionConf) {
-			const owner = collectionConf.owner;
-			if (hasPermission(permission, owner, req)) {
-				const cursor = read.read(mongo, collection, req);
-				cursor.next((err: MongoError, doc: any) => {
-					if (doc) {
-						if (req.params && req.params.link) {
-							const promise = this.linkingDoc(mongo, req, collection, doc)
-								.then((data) => {
-									callback(data);
-								});
-							promise.catch(error => {
-								callback(undefined, { error });
-							});
-						} else {
-							callback(doc);
-						}
-					} else {
-						callback(undefined, { msg: 'No se encontraron documentos' });
-					}
-				});
-			} else {
-				callback(undefined, { error: 'No tiene permisos para esta operación' });
-			}
-		} else {
+		if (!collectionConf) {
 			callback(undefined, { error: 'Colección no configurada' });
+			return;
 		}
+		const owner = collectionConf.owner;
+		if (!hasPermission(permission, owner, req)) {
+			callback(undefined, { error: 'No tiene permisos para esta operación' });
+			return;
+		}
+		const cursor = read.read(mongo, collection, req);
+		cursor.next((err: MongoError, doc: any) => {
+			if (err) {
+				callback(undefined, { error: 'Error al leer documento' });
+				return;
+			}
+			if (!doc) {
+				callback(undefined, { msg: 'No se encontraron documentos' });
+				return;
+			}
+			if (req.params && req.params.link) {
+				const promise = this.linkingDoc(mongo, req, collection, doc)
+					.then((data) => {
+						callback(data);
+					});
+				promise.catch(error => {
+					callback(undefined, { error });
+				});
+			}
+			else {
+				callback(doc);
+			}
+		});
 	}
+
 	readList(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
 		const permission = permissions.charAt(0);
-		const collProperties = mongo.getCollectionProperties(collection);
-		if (collProperties) {
-			const owner = collProperties.owner;
-			if (hasPermission(permission, owner, req)) {
-				read.read(mongo, collection, req)
-					.toArray((err: MongoError, array: Array<any>) => {
-						if (array && array.length) {
-							if (req.params && req.params.link) {
-								const promise = this.linking(mongo, req, collection, array)
-									.then(data => {
-										callback(data);
-									});
-								promise.catch(error => {
-									callback(undefined, { error });
-								});
-							} else {
-								callback(array);
-							}
-						} else {
-							callback(undefined, { msg: 'No se encontraron documentos' });
-						}
-					});
-			} else {
-				callback(undefined, { error: 'No tiene permisos para esta operación' });
-			}
-		} else {
+		const collProperties: MgCollectionProperties = mongo.getCollectionProperties(collection);
+		if (!collProperties) {
 			callback(undefined, { error: 'Colección no configurada' });
+			return;
 		}
+		const owner = collProperties.owner;
+		if (!hasPermission(permission, owner, req)) {
+			callback(undefined, { error: 'No tiene permisos para esta operación' });
+			return;
+		}
+		if (collProperties.projects) {
+			const projectIdx = parseInt(permissions.charAt(2), 10) || 0;
+			req.params.project = collProperties.projects[projectIdx] || collProperties.projects[0];
+		}
+		read.read(mongo, collection, req)
+			.toArray((err: MongoError, array: Array<any>) => {
+				if (err) {
+					callback(undefined, { error: 'Error al leer documentos' });
+					return;
+				}
+				if (!(array && array.length)) {
+					callback(undefined, { msg: 'No se encontraron documentos' });
+					return;
+				}
+				if (req.params && req.params.link) {
+					const promise = this.linking(mongo, req, collection, array)
+						.then(data => {
+							callback(data);
+						});
+					promise.catch(error => {
+						callback(undefined, { error });
+					});
+				} else {
+					callback(array);
+				}
+			});
 	}
 }
 

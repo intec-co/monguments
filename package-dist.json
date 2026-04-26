@@ -1,0 +1,23 @@
+{
+	"name": "monguments",
+	"version": "1.1.6",
+	"description": "Manage documents in Mongo defining features",
+	"main": "lib/index.js",
+	"types": "lib/index.d.ts",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/intec-co/monguments.git"
+	},
+	"keywords": [
+		"mongo",
+		"features",
+		"operations",
+		"documents"
+	],
+	"author": "intec.co <cavargasp@intec.co> (http://intec.co)",
+	"license": "MIT",
+	"dependencies": {
+		"class-validator": "^0.13.2",
+		"mongodb": "^4.9.0"
+	}
+}

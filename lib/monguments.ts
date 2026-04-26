@@ -75,7 +75,7 @@ export class Monguments {
 			) {
 				console.error(`error: in db collection ${coll}, it's not allowed versionable with id "_id"`);
 			} else {
-				this.collections[coll] = JSON.parse(JSON.stringify(collections[coll]));
+				this.collections[coll] = structuredClone(collections[coll]);
 			}
 		}
 	}

@@ -29,7 +29,7 @@ class OperationRead {
 		return mongo.collection(collection)
 			.aggregate(aggregation);
 	}
-	private readDirect(mongo: Link, collection: string, query: any, params): FindCursor {
+	private readDirect(mongo: Link, collection: string, query: any, params: MGParamsRead): FindCursor {
 		const cursor = mongo.collection(collection)
 			.find(query);
 		if (params.sort !== undefined) {

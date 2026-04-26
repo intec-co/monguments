@@ -108,9 +108,9 @@ class OperationWrite {
 				}
 			});
 		} else {
-			const $set = {  }
-			$set[p.isLast]= false;
-			coll.updateMany(query, { $set  }, { upsert: false }, err => {
+			const $set = {}
+			$set[p.isLast] = false;
+			coll.updateMany(query, { $set }, { upsert: false }, err => {
 				if (err) {
 					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
 				}
@@ -254,7 +254,7 @@ class OperationWrite {
 			if (conf.id !== '_id' && request.data._id) {
 				delete request.data._id;
 			}
-			const data = JSON.parse(JSON.stringify(request.data));
+			const data = structuredClone(request.data);
 			data[p.w] = w;
 			switch (action) {
 				case 'newDoc':

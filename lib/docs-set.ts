@@ -1,14 +1,13 @@
 import { Link } from './db-link';
-import { MgCallback, MgRequest, MgResponse, MgResult } from './interfaces';
-import { read } from './operation-read';
+import { MgCallback, MgRequest, MgResult } from './interfaces';
 import { set } from './operation-set';
 
 class DocsSet {
 	private async setOne(mongo: Link, request: MgRequest, permission: string, collection: string): Promise<MgResult> {
 		return new Promise((resolve, reject) => {
+			const collProperties = mongo.getCollectionProperties(collection);
 			if (permission === 'W' || permission === 'w' || permission === 's' || permission === 'S') {
 				if (permission === 'w' || permission === 's') {
-					const collProperties = mongo.getCollectionProperties(collection);
 					if (collProperties) {
 						const owner = collProperties.owner;
 						if (request.data.query[owner] !== request.user) {
@@ -27,7 +26,11 @@ class DocsSet {
 						return;
 					}
 				}
-				mongo.db.collection(collection).find(request.data.query)
+				const query = { ...request.data.query };
+				if (collProperties.versionable) {
+					query[collProperties.properties.isLast] = true;
+				}
+				mongo.db.collection(collection).find(query)
 					.toArray((err, array) => {
 						if (err) {
 							resolve({
@@ -35,7 +38,14 @@ class DocsSet {
 								response: { error: 'Error en docs set' }
 							});
 						} else {
-							if (array.length === 1) {
+							if (array.length === 0 && collProperties.upsert) {
+								set.set(mongo, collection, request, rsl => {
+									resolve({
+										data: undefined,
+										response: rsl
+									});
+								});
+							} else if (array.length === 1) {
 								set.set(mongo, collection, request, rsl => {
 									resolve({
 										data: undefined,
