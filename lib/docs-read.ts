@@ -135,16 +135,30 @@ class DocsRead {
 		} finally { }
 	}
 
-	read(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
+	private checkRequest(mongo: Link, collection: string, req: MgRequest, permissions: string): string {
 		const permission = permissions.charAt(0);
 		const collectionConf = mongo.getCollectionProperties(collection);
 		if (!collectionConf) {
-			callback(undefined, { error: 'Colección no configurada' });
-			return;
+			return 'Colección no configurada';
 		}
 		const owner = collectionConf.owner;
 		if (!hasPermission(permission, owner, req)) {
-			callback(undefined, { error: 'No tiene permisos para esta operación' });
+			return 'No tiene permisos para esta operación';
+		}
+		if (collectionConf.projects) {
+			const projectIdx = parseInt(permissions.charAt(2), 10) || 0;
+			if (!req.params) {
+				req.params = {};
+			}
+			req.params.project = collectionConf.projects[projectIdx] || collectionConf.projects[0];
+		}
+		return '';
+	}
+
+	read(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
+		const error = this.checkRequest(mongo, collection, req, permissions)
+		if (error) {
+			callback(undefined, { error });
 			return;
 		}
 		const cursor = read.read(mongo, collection, req);
@@ -173,20 +187,10 @@ class DocsRead {
 	}
 
 	readList(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
-		const permission = permissions.charAt(0);
-		const collProperties: MgCollectionProperties = mongo.getCollectionProperties(collection);
-		if (!collProperties) {
-			callback(undefined, { error: 'Colección no configurada' });
+		const error = this.checkRequest(mongo, collection, req, permissions)
+		if (error) {
+			callback(undefined, { error });
 			return;
-		}
-		const owner = collProperties.owner;
-		if (!hasPermission(permission, owner, req)) {
-			callback(undefined, { error: 'No tiene permisos para esta operación' });
-			return;
-		}
-		if (collProperties.projects) {
-			const projectIdx = parseInt(permissions.charAt(2), 10) || 0;
-			req.params.project = collProperties.projects[projectIdx] || collProperties.projects[0];
 		}
 		read.read(mongo, collection, req)
 			.toArray((err: MongoError, array: Array<any>) => {
