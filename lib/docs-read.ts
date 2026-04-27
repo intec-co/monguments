@@ -46,7 +46,7 @@ class DocsRead {
 			query = {};
 			query[idColl] = from;
 		}
-		if (isLast && query[isLast]) {
+		if (isLast && !query[isLast]) {
 			query[isLast] = true;
 		}
 		return query;

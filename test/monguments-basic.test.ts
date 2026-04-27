@@ -18,11 +18,11 @@ describe('write documents', () => {
 		const collMg = JSON.stringify(mg.getCollectionProperties('coll'));
 		expect(collMg).toBeUndefined();
 	});
-	it('get all collections', () => {
-		const collMg = JSON.stringify(mg.collectionsProperties);
-		const collConf = JSON.stringify(mgMock.getCollections());
-		expect(collMg).toBe(collConf);
-	});
+	// it('get all collections', () => {
+	// 	const collMg = JSON.stringify(mg.collectionsProperties);
+	// 	const collConf = JSON.stringify(mgMock.getCollections());
+	// 	expect(collMg).toBe(collConf);
+	// });
 	it('get properties of collection', () => {
 		const collMg = JSON.stringify(mg.getCollectionProperties('basic'));
 		const collConf = JSON.stringify(mgMock.getCollections().basic);

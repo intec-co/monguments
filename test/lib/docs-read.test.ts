@@ -134,6 +134,70 @@ describe('DocsRead', () => {
 
 			expect(mockCallback).toHaveBeenCalledWith({ id: 1, linkedId: 'abc', linkedData: mockLinkedDoc });
 		});
+
+		it('should set req.params.project if collectionConf has projections', () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1', projections: ['proj1', 'proj2'] });
+			(hasPermission as jest.Mock).mockReturnValue(true);
+
+			const mockCursor = { next: jest.fn((cb) => cb(null, { id: 1 })) };
+			(read.read as jest.Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any; // Trigger the !req.params branch
+
+			docsRead.read(mockMongo as any, 'testColl', mockReq, 'r-1', mockCallback);
+
+			expect(mockReq.params!.project).toBe('proj2');
+		});
+
+		it('should handle verifyPermissions returning false', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'user1' }; // no link
+				return undefined;
+			});
+			(hasPermission as jest.Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				link: [{ collection: 'linkedColl', from: 'linkedId', to: 'linkedData' }]
+			} as any;
+
+			const mockCursor = { next: jest.fn((cb) => cb(null, { id: 1, linkedId: 'abc' })) };
+			(read.read as jest.Mock).mockReturnValue(mockCursor);
+
+			const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+			docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--', mockCallback);
+			await new Promise(process.nextTick);
+
+			expect(mockCallback).toHaveBeenCalledWith({ id: 1, linkedId: 'abc' });
+			expect(consoleSpy).toHaveBeenCalled();
+			consoleSpy.mockRestore();
+		});
+
+		it('should handle asArray linking in read', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'user1', link: { 'linkedColl': true } };
+				if (collName === 'linkedColl') return { id: 'linkedId', versionable: true, properties: { isLast: 'last' } };
+				return undefined;
+			});
+			(hasPermission as jest.Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				link: [{ collection: 'linkedColl', from: 'linkedId', to: 'linkedData', asArray: true }]
+			} as any;
+
+			const mockCursor = { next: jest.fn((cb) => cb(null, { id: 1, linkedId: 'abc' })) };
+			const mockLinkedCursor = { toArray: jest.fn().mockResolvedValue([{ _id: 'abc' }]) };
+
+			(read.read as jest.Mock).mockImplementation((mongo, collName) => {
+				if (collName === 'testColl') return mockCursor;
+				if (collName === 'linkedColl') return mockLinkedCursor;
+			});
+
+			docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--', mockCallback);
+			await new Promise(process.nextTick);
+
+			expect(mockCallback).toHaveBeenCalledWith({ id: 1, linkedId: 'abc', linkedData: [{ _id: 'abc' }] });
+		});
 	});
 
 	describe('readList', () => {
@@ -232,5 +296,33 @@ describe('DocsRead', () => {
 
 			expect(mockCallback).toHaveBeenCalledWith([{ id: 1, linkedId: 'abc', linkedData: { _id: 'abc', data: 'linked' } }]);
 		});
+
+		it('should handle asArray linking in readList', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'user1', link: { 'linkedColl': true } };
+				if (collName === 'linkedColl') return { id: 'linkedId', versionable: false, properties: {} };
+				return undefined;
+			});
+			(hasPermission as jest.Mock).mockReturnValue(true);
+
+			const mockDbColl = {
+				find: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([{ _id: 'abc', data: 'linked' }]) })
+			};
+			mockMongo.db.collection.mockReturnValue(mockDbColl);
+
+			mockReq.params = {
+				link: [{ collection: 'linkedColl', from: 'linkedId', to: 'linkedData', asArray: true }]
+			} as any;
+
+			const mockArray = [{ id: 1, linkedId: 'abc' }];
+			const mockCursor = { toArray: jest.fn((cb) => cb(null, mockArray)) };
+			(read.read as jest.Mock).mockReturnValue(mockCursor);
+
+			docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--', mockCallback);
+			await new Promise(process.nextTick);
+
+			expect(mockCallback).toHaveBeenCalledWith([{ id: 1, linkedId: 'abc', linkedData: [{ _id: 'abc', data: 'linked' }] }]);
+		});
+
 	});
 });

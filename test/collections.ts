@@ -151,5 +151,26 @@ export const collsConf: MgCollections = {
 			history: '_h_*',
 			date: '_date'
 		}
+	},
+	readProjection: {
+		versionable: true,
+		versionTime: 0,
+		closable: false,
+		closeTime: 0,
+		idAuto: true,
+		link: {
+		},
+		properties:
+		{
+			isLast: 'isLast',
+			w: 'w',
+			closed: 'closed',
+			history: 'h_*',
+			date: 'date'
+		},
+		projections: [
+			{ _id: 0, id: 1, title: 1, content: 1 },
+			{ _id: 0, id: 1, title: 1, content: 1, tags: 1, views: 1 },
+		]
 	}
 };
