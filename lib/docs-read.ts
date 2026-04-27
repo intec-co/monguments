@@ -16,6 +16,42 @@ class DocsRead {
 
 		return false;
 	}
+
+	private getProjection(collectionConf: MgCollectionProperties, collectionLink: string): any {
+		if (!collectionConf.projections) {
+			return;
+		}
+		const projectionIdx = parseInt(collectionConf.link?.[collectionLink], 10) || 0;
+		return collectionConf.projections[projectionIdx] || collectionConf.projections[0];
+	}
+
+	private prepareQuery(linkQuery: string, from: any, isLast: string | undefined, idColl: string): any {
+		let query: any;
+		if (linkQuery) {
+			const type = typeof from;
+			if (type === 'string') {
+				query = linkQuery.replace(/:from/, `:"${from}"`);
+				query = query.replace(/:"from"/, `:"${from}"`);
+			} else {
+				query = linkQuery.replace(/:from/, `:${from}`);
+				query = query.replace(/:"from"/, `:${from}`);
+			}
+			try {
+				query = JSON.parse(query);
+			} catch (e) {
+				console.error('catch in parse link query');
+				return;
+			}
+		} else {
+			query = {};
+			query[idColl] = from;
+		}
+		if (isLast && query[isLast]) {
+			query[isLast] = true;
+		}
+		return query;
+	}
+
 	private async linking(mongo: Link, req: MgRequest, collection: string, array: Array<any>): Promise<any> {
 		try {
 			const collectionConf = mongo.getCollectionProperties(collection);
@@ -28,7 +64,8 @@ class DocsRead {
 						if (collectionLinkConf) {
 							const idColl = collectionLinkConf.id;
 							const isVersionable = collectionLinkConf.versionable;
-							const isLast = collectionLinkConf.properties.isLast;
+							const isLast = isVersionable ? collectionLinkConf.properties.isLast : undefined;
+							const projection = this.getProjection(collectionLinkConf, collectionLink);
 							let linkQuery;
 							const dbColl = mongo.db.collection(collectionLink);
 							const to = singleLink.to;
@@ -39,35 +76,11 @@ class DocsRead {
 							for (const item of array) {
 								const from = getValue(item, singleLink.from);
 								if (from) {
-									let query: any;
-									if (linkQuery) {
-										const type = typeof from;
-										if (type === 'string') {
-											query = linkQuery.replace(/:from/, `:"${from}"`);
-											query = query.replace(/:"from"/, `:"${from}"`);
-										} else {
-											query = linkQuery.replace(/:from/, `:${from}`);
-											query = query.replace(/:"from"/, `:${from}`);
-										}
-										try {
-											query = JSON.parse(query);
-										} catch (e) {
-											console.error('catch in parse link query');
-											break;
-										}
-									} else {
-										query = {};
-										query[idColl] = from;
-									}
-									if (isVersionable && !query[isLast]) {
-										query[isLast] = true;
-									}
-									if (from) {
-										item[to] = (asArray) ?
-											await dbColl.find(query)
-												.toArray() :
-											await dbColl.findOne(query);
-									}
+									const query = this.prepareQuery(linkQuery, from, isLast, idColl);
+									if (!query) break;
+									item[to] = (asArray) ?
+										await dbColl.find(query, { projection }).toArray() :
+										await dbColl.findOne(query, { projection });
 								}
 							}
 						}
@@ -88,8 +101,8 @@ class DocsRead {
 				for (const singleLink of link) {
 					if (this.verifyPermissions(singleLink, collectionConf, collection)) {
 						const collectionLink = singleLink.collection;
-						let query: any;
 						const collLinkProperties = mongo.getCollectionProperties(collectionLink);
+						const project = this.getProjection(collLinkProperties, collectionLink);
 						if (collLinkProperties) {
 							const idColl = collLinkProperties.id;
 							let linkQuery;
@@ -97,27 +110,12 @@ class DocsRead {
 								linkQuery = singleLink.query;
 							}
 							const from = doc[singleLink.from];
-							if (linkQuery) {
-								const type = typeof from;
-								if (type === 'string') {
-									query = linkQuery.replace(/:from/, `:"${from}"`);
-									query = query.replace(/:"from"/, `:"${from}"`);
-								} else {
-									query = linkQuery.replace(/:from/, `:${from}`);
-									query = query.replace(/:"from"/, `:${from}`);
-								}
-								try {
-									query = JSON.parse(query);
-								} catch (e) {
-									console.error('catch in parse link query');
-									break;
-								}
-							} else {
-								query = {};
-								query[idColl] = from;
-							}
+							const query = this.prepareQuery(linkQuery, from, undefined, idColl);
 							const requestLink = {
-								data: query
+								data: query,
+								params: {
+									project
+								}
 							};
 							doc[singleLink.to] = (singleLink.asArray) ?
 								await read.read(mongo, collectionLink, requestLink)
@@ -145,12 +143,12 @@ class DocsRead {
 		if (!hasPermission(permission, owner, req)) {
 			return 'No tiene permisos para esta operación';
 		}
-		if (collectionConf.projects) {
+		if (collectionConf.projections) {
 			const projectIdx = parseInt(permissions.charAt(2), 10) || 0;
 			if (!req.params) {
 				req.params = {};
 			}
-			req.params.project = collectionConf.projects[projectIdx] || collectionConf.projects[0];
+			req.params.project = collectionConf.projections[projectIdx] || collectionConf.projections[0];
 		}
 		return '';
 	}

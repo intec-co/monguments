@@ -31,7 +31,7 @@ export interface MgCollectionProperties {
 	versionTime?: number;
 	versionField?: string;
 	upsert?: boolean;
-	projects?: any[];
+	projections?: any[];
 }
 
 export interface MgCollections { [key: string]: MgCollectionProperties; }
