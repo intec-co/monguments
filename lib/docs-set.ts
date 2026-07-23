@@ -1,131 +1,92 @@
 import { Link } from './db-link';
-import { MgCallback, MgRequest, MgResult } from './interfaces';
+import { MgRequest, MgResult } from './interfaces';
 import { set } from './operation-set';
 
 class DocsSet {
 	private async setOne(mongo: Link, request: MgRequest, permission: string, collection: string): Promise<MgResult> {
-		return new Promise((resolve, reject) => {
-			const collProperties = mongo.getCollectionProperties(collection);
-			if (permission === 'W' || permission === 'w' || permission === 's' || permission === 'S') {
-				if (permission === 'w' || permission === 's') {
-					if (collProperties) {
-						const owner = collProperties.owner;
-						if (request.data.query[owner] !== request.user) {
-							resolve({
-								data: undefined,
-								response: { error: 'No tiene permisos para esta operación' }
-							});
-
-							return;
-						}
-					} else {
-						resolve({
+		const collProperties = mongo.getCollectionProperties(collection);
+		if (permission === 'W' || permission === 'w' || permission === 's' || permission === 'S') {
+			if (permission === 'w' || permission === 's') {
+				if (collProperties) {
+					const owner = collProperties.owner;
+					if (!owner || request.data.query[owner] !== request.user) {
+						return {
 							data: undefined,
-							response: { error: 'Colección no configurada' }
-						});
-						return;
+							response: { error: 'No tiene permisos para esta operación' }
+						};
 					}
+				} else {
+					return {
+						data: undefined,
+						response: { error: 'Colección no configurada' }
+					};
 				}
-				const query = { ...request.data.query };
-				if (collProperties.versionable) {
-					query[collProperties.properties.isLast] = true;
-				}
-				mongo.db.collection(collection).find(query)
-					.toArray((err, array) => {
-						if (err) {
-							resolve({
-								data: undefined,
-								response: { error: 'Error en docs set' }
-							});
-						} else {
-							if (array.length === 0 && collProperties.upsert) {
-								set.set(mongo, collection, request, rsl => {
-									resolve({
-										data: undefined,
-										response: rsl
-									});
-								});
-							} else if (array.length === 1) {
-								set.set(mongo, collection, request, rsl => {
-									resolve({
-										data: undefined,
-										response: rsl
-									});
-								});
-							}
-							// ToDo como validar que sean varios documentos
-							// if (array.length === 1)
-							// 				set(mongo, collection, request, callback);
-							// else if (array.length > 1) {
-							// 				var idColl = mongo.getCollectionId(collection);
-							// 				if (idColl !== undefined) {
-							// 								setArray(mongo, request, collection, array, idColl, 0, callback);
-							// 				}
-							// }
-							// else {
-							// 				callback(undefined,{ msg: "Nada para cambiar" });
-							// }
-						}
-					});
-			} else {
-				resolve({
-					data: undefined,
-					response: { error: 'No tiene permisos para esta operación' }
-				});
 			}
-		});
+			if (!collProperties) {
+				return {
+					data: undefined,
+					response: { error: 'Colección no configurada' }
+				};
+			}
+			try {
+				const rsl = await set.set(mongo, collection, request);
+				if (rsl.response?.error && rsl.response.error.includes('no se encon') && !collProperties.upsert) {
+					return {
+						data: undefined,
+						response: { error: 'No se encontraron documentos' }
+					};
+				}
+				return {
+					data: undefined,
+					response: rsl.response || rsl.data
+				};
+			} catch (err) {
+				return {
+					data: undefined,
+					response: { error: 'Error en docs set' }
+				};
+			}
+		} else {
+			return {
+				data: undefined,
+				response: { error: 'No tiene permisos para esta operación' }
+			};
+		}
 	}
-	// private setArray(
-	// 	mongo: Link, request: MgRequest, collection: string,
-	// 	array: Array<any>, idColl: string, idx: number, callback: MgCallback
-	// ): void {
-	// 	if (idx < array.length) {
-	// 		const req: MgRequest = {
-	// 			data: {
-	// 				set: request.data.set,
-	// 				query: {}
-	// 			},
-	// 			ips: request.ips,
-	// 			user: request.user
-	// 		};
-	// 		req.data.query[idColl] = array[idx][idColl];
-	// 		set.set(mongo, collection, req, () => {
-	// 			this.setArray(mongo, request, collection, array, idColl, idx + 1, callback);
-	// 		});
-	// 	} else {
-	// 		callback(undefined, { msg: 'documentos actualizados' });
-	// 	}
-	// }
-	async set(mongo: Link, collection: string, request: MgRequest, permissions: string, callback: MgCallback) {
+
+	async set(mongo: Link, collection: string, request: MgRequest, permissions: string): Promise<MgResult> {
 		const permission = permissions.charAt(1);
 		if (Array.isArray(request.data)) {
+			const results = await Promise.all(
+				request.data.map(oneSet => {
+					const req = { ...request, data: oneSet };
+					return this.setOne(mongo, req, permission, collection);
+				})
+			);
 			const res: Array<any> = [];
-			for (const oneSet of request.data) {
-				const req = { ...request, data: oneSet };
-				const rsl = await this.setOne(mongo, req, permission, collection);
-				res.push(rsl.data, rsl.response);
-			}
-			callback(res);
+			results.forEach(rsl => res.push(rsl.data, rsl.response));
+			return { data: res };
 		} else {
-			if (!request.data.query) {
-				callback(undefined, { error: 'query undefined' });
-
-				return;
+			if (!request.data || !request.data.query) {
+				return { response: { error: 'query undefined' } };
 			}
 			if (Array.isArray(request.data.query)) {
+				const results = await Promise.all(
+					request.data.query.map(oneQuery => {
+						const newData = { ...request.data, query: oneQuery };
+						const req = { ...request, data: newData };
+						return this.setOne(mongo, req, permission, collection);
+					})
+				);
 				const res: Array<any> = [];
-				for (const oneQuery of request.data.query) {
-					const newData = { ...request.data, query: oneQuery };
-					const req = { ...request, data: newData };
-					const rsl = await this.setOne(mongo, req, permission, collection);
-					res.push(rsl.data, rsl.response);
-				}
-				callback(res);
+				results.forEach(rsl => res.push(rsl.data, rsl.response));
+				return { data: res };
 			} else {
 				const rsl = await this.setOne(mongo, request, permission, collection);
-				callback(rsl.data, rsl.response);
+				return { data: rsl.data, response: rsl.response };
 			}
 		}
 	}
 }
+
 export const docsSet = new DocsSet();

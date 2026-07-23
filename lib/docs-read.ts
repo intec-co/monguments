@@ -1,7 +1,6 @@
 import { read } from './operation-read';
 import { hasPermission } from './has-permission';
-import { getValue } from './tools';
-import { MgCollectionProperties, MgLink, MgRequest, MgCallback } from './interfaces';
+import { MgCollectionProperties, MgLink, MgRequest, MgResult } from './interfaces';
 import { MongoError } from 'mongodb';
 import { Link } from './db-link';
 
@@ -25,112 +24,102 @@ class DocsRead {
 		return collectionConf.projections[projectionIdx] || collectionConf.projections[0];
 	}
 
-	private prepareQuery(linkQuery: string, from: any, isLast: string | undefined, idColl: string): any {
-		let query: any;
-		if (linkQuery) {
-			const type = typeof from;
-			if (type === 'string') {
-				query = linkQuery.replace(/:from/, `:"${from}"`);
-				query = query.replace(/:"from"/, `:"${from}"`);
+	private prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): void {
+		if (!req.params || !req.params.link || !Array.isArray(req.params.link)) {
+			return;
+		}
+
+		const collectionConf = mongo.getCollectionProperties(collection);
+		if (!collectionConf) {
+			return;
+		}
+
+		const lookupStages: any[] = [];
+		for (const singleLink of req.params.link) {
+			if (this.verifyPermissions(singleLink, collectionConf, collection)) {
+				const collectionLink = singleLink.collection;
+				const collectionLinkConf = mongo.getCollectionProperties(collectionLink);
+				if (collectionLinkConf) {
+					const idColl = collectionLinkConf.id || '_id';
+					const isVersionable = collectionLinkConf.versionable;
+					const isLast = isVersionable ? collectionLinkConf.properties?.isLast : undefined;
+					const projection = this.getProjection(collectionLinkConf, collectionLink);
+
+					let targetForeignField: string = idColl;
+					if (singleLink.query) {
+						const qStr = singleLink.query
+							.replace(/:\s*"from"/g, ':"$$fromVal"')
+							.replace(/:\s*from\b/g, ':"$$fromVal"');
+						try {
+							const raw = JSON.parse(qStr);
+							const keys = Object.keys(raw);
+							if (keys.length === 1 && raw[keys[0]] === '$$fromVal') {
+								targetForeignField = keys[0];
+							}
+						} catch (e) {
+							console.error('catch in parse link query');
+							continue;
+						}
+					}
+
+					if (isVersionable) {
+						const pipeline: any[] = [
+							{
+								$match: {
+									$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
+									...(isLast ? { [isLast]: true } : {})
+								}
+							}
+						];
+						if (!singleLink.asArray) {
+							pipeline.push({ $limit: 1 });
+						}
+						if (projection) {
+							const projCopy = { ...projection };
+							if (collectionLinkConf.id !== '_id' && projCopy._id === undefined) {
+								projCopy._id = 0;
+							}
+							pipeline.push({ $project: projCopy });
+						}
+						lookupStages.push({
+							$lookup: {
+								from: collectionLink,
+								let: { fromVal: `$${singleLink.from}` },
+								pipeline,
+								as: singleLink.to
+							}
+						});
+					} else {
+						lookupStages.push({
+							$lookup: {
+								from: collectionLink,
+								localField: singleLink.from,
+								foreignField: targetForeignField,
+								as: singleLink.to
+							}
+						});
+					}
+
+					if (!singleLink.asArray) {
+						lookupStages.push({
+							$addFields: {
+								[singleLink.to]: { $arrayElemAt: [`$${singleLink.to}`, 0] }
+							}
+						});
+					}
+				}
+			}
+		}
+
+		if (lookupStages.length > 0) {
+			if (!req.params.lookup) {
+				req.params.lookup = lookupStages;
+			} else if (Array.isArray(req.params.lookup)) {
+				req.params.lookup = [...req.params.lookup, ...lookupStages];
 			} else {
-				query = linkQuery.replace(/:from/, `:${from}`);
-				query = query.replace(/:"from"/, `:${from}`);
+				req.params.lookup = [req.params.lookup, ...lookupStages];
 			}
-			try {
-				query = JSON.parse(query);
-			} catch (e) {
-				console.error('catch in parse link query');
-				return;
-			}
-		} else {
-			query = {};
-			query[idColl] = from;
 		}
-		if (isLast && !query[isLast]) {
-			query[isLast] = true;
-		}
-		return query;
-	}
-
-	private async linking(mongo: Link, req: MgRequest, collection: string, array: Array<any>): Promise<any> {
-		try {
-			const collectionConf = mongo.getCollectionProperties(collection);
-			if (collectionConf) {
-				const link = req.params.link;
-				for (const singleLink of link) {
-					if (this.verifyPermissions(singleLink, collectionConf, collection)) {
-						const collectionLink = singleLink.collection;
-						const collectionLinkConf = mongo.getCollectionProperties(collectionLink);
-						if (collectionLinkConf) {
-							const idColl = collectionLinkConf.id;
-							const isVersionable = collectionLinkConf.versionable;
-							const isLast = isVersionable ? collectionLinkConf.properties.isLast : undefined;
-							const projection = this.getProjection(collectionLinkConf, collectionLink);
-							let linkQuery;
-							const dbColl = mongo.db.collection(collectionLink);
-							const to = singleLink.to;
-							const asArray = singleLink.asArray;
-							if (singleLink.query) {
-								linkQuery = singleLink.query;
-							}
-							for (const item of array) {
-								const from = getValue(item, singleLink.from);
-								if (from) {
-									const query = this.prepareQuery(linkQuery, from, isLast, idColl);
-									if (!query) break;
-									item[to] = (asArray) ?
-										await dbColl.find(query, { projection }).toArray() :
-										await dbColl.findOne(query, { projection });
-								}
-							}
-						}
-					}
-				}
-
-				return array;
-			}
-		} catch (e) {
-			return e;
-		} finally { }
-	}
-	private async linkingDoc(mongo: Link, req: MgRequest, collection: string, doc: any): Promise<any> {
-		try {
-			const collectionConf = mongo.getCollectionProperties(collection);
-			if (collectionConf && doc) {
-				const link = req.params.link;
-				for (const singleLink of link) {
-					if (this.verifyPermissions(singleLink, collectionConf, collection)) {
-						const collectionLink = singleLink.collection;
-						const collLinkProperties = mongo.getCollectionProperties(collectionLink);
-						const project = this.getProjection(collLinkProperties, collectionLink);
-						if (collLinkProperties) {
-							const idColl = collLinkProperties.id;
-							let linkQuery;
-							if (singleLink.query) {
-								linkQuery = singleLink.query;
-							}
-							const from = doc[singleLink.from];
-							const query = this.prepareQuery(linkQuery, from, undefined, idColl);
-							const requestLink = {
-								data: query,
-								params: {
-									project
-								}
-							};
-							doc[singleLink.to] = (singleLink.asArray) ?
-								await read.read(mongo, collectionLink, requestLink)
-									.toArray() :
-								await read.read(mongo, collectionLink, requestLink)
-									.next();
-						}
-					}
-				}
-			}
-
-			return doc;
-		} catch (e) {
-			return e;
-		} finally { }
 	}
 
 	private checkRequest(mongo: Link, collection: string, req: MgRequest, permissions: string): string {
@@ -153,66 +142,42 @@ class DocsRead {
 		return '';
 	}
 
-	read(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
-		const error = this.checkRequest(mongo, collection, req, permissions)
+	async read(mongo: Link, collection: string, req: MgRequest, permissions: string): Promise<MgResult> {
+		const error = this.checkRequest(mongo, collection, req, permissions);
 		if (error) {
-			callback(undefined, { error });
-			return;
+			return { response: { error } };
 		}
-		const cursor = read.read(mongo, collection, req);
-		cursor.next((err: MongoError, doc: any) => {
-			if (err) {
-				callback(undefined, { error: 'Error al leer documento' });
-				return;
-			}
+		this.prepareLinkLookup(mongo, collection, req);
+		try {
+			const cursor = read(mongo, collection, req);
+			const doc = await cursor.next();
 			if (!doc) {
-				callback(undefined, { msg: 'No se encontraron documentos' });
-				return;
+				return { response: { msg: 'No se encontraron documentos' } };
 			}
-			if (req.params && req.params.link) {
-				const promise = this.linkingDoc(mongo, req, collection, doc)
-					.then((data) => {
-						callback(data);
-					});
-				promise.catch(error => {
-					callback(undefined, { error });
-				});
-			}
-			else {
-				callback(doc);
-			}
-		});
+			return { data: doc };
+		} catch (err: any) {
+			return { response: { error: err?.message || 'Error al leer documento' } };
+		}
 	}
 
-	readList(mongo: Link, collection: string, req: MgRequest, permissions: string, callback: MgCallback): void {
-		const error = this.checkRequest(mongo, collection, req, permissions)
+	async readList(mongo: Link, collection: string, req: MgRequest, permissions: string): Promise<MgResult> {
+		const error = this.checkRequest(mongo, collection, req, permissions);
 		if (error) {
-			callback(undefined, { error });
-			return;
+			return { response: { error } };
 		}
-		read.read(mongo, collection, req)
-			.toArray((err: MongoError, array: Array<any>) => {
-				if (err) {
-					callback(undefined, { error: 'Error al leer documentos' });
-					return;
-				}
-				if (!(array && array.length)) {
-					callback(undefined, { msg: 'No se encontraron documentos' });
-					return;
-				}
-				if (req.params && req.params.link) {
-					const promise = this.linking(mongo, req, collection, array)
-						.then(data => {
-							callback(data);
-						});
-					promise.catch(error => {
-						callback(undefined, { error });
-					});
-				} else {
-					callback(array);
-				}
-			});
+		this.prepareLinkLookup(mongo, collection, req);
+		try {
+			const cursor = read(mongo, collection, req);
+			const array = await cursor.toArray();
+			if (!(array && array.length)) {
+				return { response: { msg: 'No se encontraron documentos' } };
+			}
+			return { data: array };
+		} catch (err: any) {
+			return { response: { error: err?.message || 'Error al leer documentos' } };
+		}
 	}
 }
 
 export const docsRead = new DocsRead();
+

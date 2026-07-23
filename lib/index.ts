@@ -2,35 +2,19 @@ import { MongoClient } from 'mongodb';
 import { MgClient, MgConf } from './interfaces';
 import { Monguments } from './monguments';
 
-export function mgConnectDb(conf: MgConf, client: MgClient, callback: (mg?: Monguments) => void): void;
-export function mgConnectDb(conf: MgConf, client: MgClient): Promise<Monguments>;
-
-export function mgConnectDb(conf: MgConf, client: MgClient, callback?: (mg?: Monguments) => void): Promise<Monguments> | void {
+export async function mgConnectDb(conf: MgConf, client: MgClient): Promise<Monguments> {
 	const collections = client.collections;
-
-	let done: (mg: Monguments) => void;
-	const promise: Promise<Monguments> = new Promise((resolve, reject) => {
-		done = resolve;
-	});
-	if (callback) {
-		done = callback;
-	}
 	const mongodbClient = new MongoClient(conf.uri);
-	mongodbClient.connect((err, mongoClient) => {
-		if (err) {
-			console.error(err);
-			if (callback) {
-				callback();
-			}
-			throw new Error('Could not connect to mongodb');
-		}
-		const db = mongoClient.db(client.db);
-		done(new Monguments(db, collections));
-	});
-	if (!callback) {
-		return promise;
+	try {
+		await mongodbClient.connect();
+		const db = mongodbClient.db(client.db);
+		return new Monguments(db, collections);
+	} catch (err) {
+		console.error(err);
+		throw new Error('Could not connect to mongodb');
 	}
 }
 
 export * from './interfaces';
 export * from './monguments';
+export * from './operation-transition';

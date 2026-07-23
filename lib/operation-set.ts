@@ -1,24 +1,26 @@
 import { Collection } from 'mongodb';
-import { checkData } from './check-data';
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgRequest } from './interfaces';
+import { MgCollectionProperties, MgRequest, MgResult } from './interfaces';
+import { validateDocumentData, validateQueryFilter } from './query-validator';
+import { operationTransition } from './operation-transition';
+
 export class OperationSet {
-	private write(
+	private async write(
 		coll: Collection, conf: MgCollectionProperties, request: MgRequest,
-		opened: boolean, toClosed: boolean, callback: MgCallback
-	): void {
-		let set: any = {};
+		opened: boolean, toClosed: boolean, customQuery?: any
+	): Promise<MgResult> {
+		let setObj: any = {};
 		const push: any = {};
 		const date = new Date().getTime();
 		const p = conf.properties;
 		const properties = (opened) ? conf.set : conf.setClosed;
 		if (properties === '*') {
-			set = request.data.set;
-			for (const prop in set) {
-				if (set.hasOwnProperty(prop)) {
+			setObj = request.data.set;
+			for (const prop in setObj) {
+				if (setObj.hasOwnProperty(prop)) {
 					const history = p.history.replace('*', prop);
 					push[history] = {
-						value: set[prop],
+						value: setObj[prop],
 						date,
 						id: request.user,
 						ips: request.ips
@@ -28,10 +30,10 @@ export class OperationSet {
 		} else if (Array.isArray(properties)) {
 			properties.forEach(prop => {
 				if (request.data.set[prop] !== undefined) {
-					set[prop] = request.data.set[prop];
+					setObj[prop] = request.data.set[prop];
 					const history = p.history.replace('*', prop);
 					push[history] = {
-						value: set[prop],
+						value: setObj[prop],
 						date,
 						id: request.user,
 						ips: request.ips
@@ -45,90 +47,124 @@ export class OperationSet {
 				id: request.user,
 				ips: request.ips
 			};
-			set[p.closed] = true;
-			set._wClose = w;
+			setObj[p.closed] = true;
+			setObj._wClose = w;
 		}
-		if (Object.keys(set).length) {
+		if (Object.keys(setObj).length) {
 			const update = {
-				$set: set,
+				$set: setObj,
 				$push: push
 			};
 			const upsert = conf.upsert;
-			coll.updateOne(request.data.query, update, { upsert }, err => {
-				if (err) {
-					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.set document' });
-				} else {
-					callback(undefined, { msg: 'información guardada' });
+			const queryToUse = customQuery || request.data.query;
+			try {
+				const result = await coll.updateOne(queryToUse, update, { upsert });
+				if (customQuery) {
+					const isMatched = result && (
+						result.matchedCount > 0 ||
+						result.modifiedCount > 0 ||
+						result.upsertedCount > 0 ||
+						(!('matchedCount' in result) && !('modifiedCount' in result))
+					);
+					if (isMatched) {
+						return { response: { msg: 'información guardada' } };
+					}
+					return { response: { error: 'not_matched' } };
 				}
-			});
+				return { response: { msg: 'información guardada' } };
+			} catch (err) {
+				return { response: { error: 'ha ocurrido un error', msg: 'error mongo.set document' } };
+			}
 		} else {
-			callback(undefined, { error: '$set is empty' });
+			return { response: { error: '$set is empty' } };
 		}
 	}
 
-	set(mongo: Link, collection: string, request: MgRequest, callback: MgCallback): void {
-		if (!request.data.set || !request.data.query) {
-			callback(undefined, { error: 'data or query is undefined' });
-
-			return;
+	async set(mongo: Link, collection: string, request: MgRequest): Promise<MgResult> {
+		if (!request.data || !request.data.set || !request.data.query) {
+			return { response: { error: 'data or query is undefined' } };
 		}
-		if (!checkData(request.data.set)) {
-			callback(undefined, { error: 'documento con propiedad no permitida' });
-
-			return;
+		const validQ = validateQueryFilter(request.data.query);
+		if (!validQ.valid) {
+			return { response: { error: validQ.reason || 'Consulta no válida' } };
+		}
+		if (!validateDocumentData(request.data.set).valid) {
+			return { response: { error: 'documento con propiedad no permitida' } };
 		}
 		const coll = mongo.db.collection(collection);
 		const conf: MgCollectionProperties | undefined = mongo.getCollectionProperties(collection);
 		if (conf) {
+			if (conf.workflow) {
+				const stateField = conf.workflow.stateField || '_state';
+				if (request.data.set[stateField] !== undefined) {
+					const filterQ = { ...request.data.query };
+					if (conf.versionable) {
+						filterQ[conf.properties.isLast] = true;
+					}
+					const doc = await coll.findOne(filterQ);
+					const targetState = request.data.set[stateField];
+					const validation = operationTransition.validateTransition(
+						conf, doc, targetState, request.roles || [], request.data.set
+					);
+					if (!validation.valid) {
+						return { response: { error: validation.error } };
+					}
+				}
+			}
 			const p = conf.properties;
 			const query = { ...request.data.query };
 			if (conf.versionable) {
 				query[p.isLast] = true;
 			}
 			if (conf.closable) {
-				coll.findOne(query, (err, doc) => {
-					if (err) {
-						callback(undefined, { error: 'error en mongo.set' });
-
-						return;
+				try {
+					const targetQuery = { ...query, [p.closed]: { $ne: true } };
+					if (conf.exclusive) {
+						targetQuery[`${p.w}.id`] = request.user;
 					}
-					if (!doc) {
-						callback(undefined, { error: 'error en mongo.set, no se encontró el documento' });
+					if (conf.closeTime >= 0) {
+						const minDate = new Date().getTime() - (conf.closeTime * 60000);
+						targetQuery[p.date] = { $gte: minDate };
+					}
 
-						return;
+					const atomicRes = await this.write(coll, conf, { ...request, data: { ...request.data, query } }, true, false, targetQuery);
+					if (atomicRes.response && atomicRes.response.msg) {
+						return atomicRes;
+					}
+
+					const doc = await coll.findOne(query);
+					if (!doc) {
+						return { response: { error: 'error en mongo.set, no se encontró el documento' } };
 					}
 					if (conf.exclusive) {
-						if (doc[p.w].id !== request.user) {
-							callback(undefined, { error: 'Usuario no es propietario del documento' });
-
-							return;
+						if (doc[p.w]?.id !== request.user) {
+							return { response: { error: 'Usuario no es propietario del documento' } };
 						}
 					}
 					let opened = false;
 					let toClosed = false;
-					if (conf.closable) {
-						if (!doc[p.closed]) {
-							if (conf.closeTime >= 0) {
-								const milli = new Date().getTime() - doc[p.date];
-								const min = milli / 60000;
-								if (conf.closeTime > min) {
-									opened = true;
-								} else {
-									toClosed = true;
-								}
-							} else {
+					if (!doc[p.closed]) {
+						if (conf.closeTime >= 0) {
+							const milli = new Date().getTime() - doc[p.date];
+							const min = milli / 60000;
+							if (conf.closeTime > min) {
 								opened = true;
+							} else {
+								toClosed = true;
 							}
+						} else {
+							opened = true;
 						}
 					}
-					this.write(coll, conf, request, opened, toClosed, callback);
-
-					return;
-				});
+					return this.write(coll, conf, { ...request, data: { ...request.data, query } }, opened, toClosed);
+				} catch (err) {
+					return { response: { error: 'error en mongo.set' } };
+				}
 			} else {
-				this.write(coll, conf, request, true, false, callback);
+				return this.write(coll, conf, { ...request, data: { ...request.data, query } }, true, false);
 			}
 		}
+		return { response: { error: 'Colección no configurada' } };
 	}
 }
 

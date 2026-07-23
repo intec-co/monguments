@@ -1,55 +1,110 @@
 import { Link } from './db-link';
-import { MgCallback, MgRequest, MgResponse } from './interfaces';
+import { MgRequest, MgResult, MgW } from './interfaces';
 import { write } from './operation-write';
-class DocsWrite {
-	private async writeAsync(mongo: Link, collection: string, request: MgRequest): Promise<any> {
-		return new Promise((resolve, reject) => {
-			write.write(mongo, collection, request, response => {
-				resolve(response);
-			});
-		});
-	}
+import { validateDocumentData } from './query-validator';
 
-	async write(mongo: Link, collection: string, request: MgRequest, permissions: string, callback: MgCallback) {
+class DocsWrite {
+	async write(mongo: Link, collection: string, request: MgRequest, permissions: string): Promise<MgResult> {
 		const collProperties = mongo.getCollectionProperties(collection);
 		if (collProperties) {
 			const owner = collProperties.owner;
-			// TODO write exclusive
 			const permission: string = permissions.charAt(1);
 			if (Array.isArray(request.data)) {
 				if (permission === 'W' || permission === 'C') {
-					const res: Array<MgResponse> = [];
-					for (const doc of request.data) {
-						const oneReq = { ...request, data: doc };
-						const rst = await this.writeAsync(mongo, collection, oneReq);
-						res.push(rst);
+					const count = request.data.length;
+					if (count === 0) {
+						return { data: [], response: { msg: 'Información guardada' } };
 					}
-					callback(res, { error: 'Información guardada' });
+
+					const idColl = collProperties.id || (typeof mongo.getCollectionId === 'function' ? mongo.getCollectionId(collection) : '_id');
+					if (!idColl) {
+						return { response: { error: 'id collection undefined' } };
+					}
+
+					const isAllNewAutoDocs = collProperties.idAuto && request.data.every(doc =>
+						validateDocumentData(doc).valid &&
+						(!doc[idColl] || doc[idColl] === -1) &&
+						(!collProperties.required.length || collProperties.required.every(req => doc[req] !== undefined))
+					);
+
+					if (isAllNewAutoDocs) {
+						const date = new Date().getTime();
+						const w: MgW = { id: request.user, date, ips: request.ips };
+						const db = mongo.db;
+
+						try {
+							const counters = db.collection('counters');
+							const counterRes = await counters.findOneAndUpdate(
+								{ _id: collection as any },
+								{ $inc: { seq: count } },
+								{ returnDocument: 'after', upsert: true }
+							);
+							const endSeq = counterRes?.value ? counterRes.value.seq : counterRes?.seq || count;
+							const startSeq = endSeq - count + 1;
+							const p = collProperties.properties;
+
+							const docsToInsert: any[] = [];
+							const resData: any[] = [];
+
+							request.data.forEach((rawDoc, idx) => {
+								if (collProperties.id !== '_id' && rawDoc._id) {
+									delete rawDoc._id;
+								}
+								const doc = structuredClone(rawDoc);
+								const seq = startSeq + idx;
+								doc[idColl] = seq;
+								if (collProperties.versionField) {
+									doc[collProperties.versionField] = seq;
+								}
+								doc[p.w] = w;
+								doc[p.date] = date;
+								if (collProperties.closable) {
+									doc[p.closed] = (collProperties.closeTime === 0);
+								}
+								doc[p.isLast] = true;
+								docsToInsert.push(doc);
+
+								const resObj: any = {};
+								resObj[idColl] = seq;
+								resData.push(resObj);
+							});
+
+							await mongo.collection(collection).insertMany(docsToInsert);
+							return { data: resData, response: { msg: 'Información guardada' } };
+						} catch (err) {
+							// Fallback to individual writes if batch insert fails
+						}
+					}
+
+					const results = await Promise.all(
+						request.data.map(doc => write.write(mongo, collection, { ...request, data: doc }))
+					);
+					const res = results.map(rst => rst.data);
+					return { data: res, response: { msg: 'Información guardada' } };
 				} else {
-					callback(undefined, { error: 'No tiene permisos para esta operación' });
+					return { response: { error: 'No tiene permisos para esta operación' } };
 				}
 			} else {
 				if (request.data === undefined) {
-					callback(undefined, { error: 'sin datos' });
-
-					return;
+					return { response: { error: 'sin datos' } };
 				}
 				if (permission === 'w' || permission === 'W') {
-					if (permission === 'w' && request.data[owner] !== request.user) {
-						callback(undefined, { error: 'no tiene permiso para escribir el documento' });
+					if (permission === 'w' && owner && request.data[owner] !== request.user) {
+						return { response: { error: 'no tiene permiso para escribir el documento' } };
 					} else {
-						write.write(mongo, collection, request, callback);
+						return write.write(mongo, collection, request);
 					}
 				} else if (permission === 'C') {
-					write.write(mongo, collection, request, callback);
+					return write.write(mongo, collection, request);
 				} else {
-					callback(undefined, { error: 'No tiene permisos para esta operación' });
+					return { response: { error: 'No tiene permisos para esta operación' } };
 				}
 			}
 		} else {
-			callback(undefined, { error: 'Colección no configurada' });
+			return { response: { error: 'Colección no configurada' } };
 		}
 	}
 }
 
 export const docsWrite = new DocsWrite();
+

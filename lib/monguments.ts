@@ -1,9 +1,7 @@
-import { AggregationCursor, Collection, FindCursor, Db, MongoError } from 'mongodb';
+import { AggregationCursor, Collection, Db, FindCursor } from 'mongodb';
 import { docProcess } from './docs-process';
-
 import { Link } from './db-link';
 import {
-	MgCallback,
 	MgCollectionProperties,
 	MgCollections,
 	MgRequest,
@@ -15,6 +13,7 @@ import { close } from './operation-close';
 import { read } from './operation-read';
 import { set } from './operation-set';
 import { write } from './operation-write';
+import { operationTransition } from './operation-transition';
 
 export class Monguments {
 	get collectionsProperties(): MgCollections {
@@ -26,11 +25,11 @@ export class Monguments {
 	private readonly _db: Db;
 	private readonly collections: MgCollections;
 	private readonly link: Link;
+
 	constructor(db: Db, collections: MgCollections) {
 		this._db = db;
 		this.collections = {};
 		this.link = new Link(db, collections);
-		// tslint:disable-next-line: forin
 		for (const coll in collections) {
 			if (!collections[coll].owner) {
 				collections[coll].owner = undefined;
@@ -65,6 +64,15 @@ export class Monguments {
 			if (!collections[coll].required) {
 				collections[coll].required = [];
 			}
+			if (collections[coll].workflow) {
+				const wf = collections[coll].workflow;
+				if (!wf.stateField) {
+					wf.stateField = '_state';
+				}
+				if (wf.versionOnTransition === undefined) {
+					wf.versionOnTransition = true;
+				}
+			}
 			if (
 				collections[coll].versionable &&
 				collections[coll].id === '_id' &&
@@ -79,66 +87,56 @@ export class Monguments {
 			}
 		}
 	}
-	add(collection: string, request: MgRequest, callback: MgCallback): void {
-		add.add(this.link, collection, request, callback);
+
+	async add(collection: string, request: MgRequest): Promise<MgResult> {
+		return add.add(this.link, collection, request);
 	}
-	async close(collection: string, request: MgRequest, callback: MgCallback): Promise<void> {
-		close(this.link, collection, request, callback);
+
+	async close(collection: string, request: MgRequest): Promise<MgResult> {
+		return close(this.link, collection, request);
 	}
+
 	getCollection(collection: string): Collection {
 		return this._db.collection(collection);
 	}
+
 	getCollectionId(collection: string): string {
 		return this.collections[collection].id;
 	}
+
 	getCollectionProperties(collection: string): MgCollectionProperties | undefined {
 		if (this.collections[collection]) {
 			return this.collections[collection];
 		}
-
 		return undefined;
 	}
-	getCounter(collection: string, callback: MgCallback): void {
-		this._db.collection('counters')
-			.findOneAndUpdate(
-				{ _id: collection }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' },
-				(err: MongoError, doc: any) => {
-					callback(doc);
-				});
+
+	async getCounter(collection: string): Promise<any> {
+		const doc = await this._db.collection('counters').findOneAndUpdate(
+			{ _id: collection as any },
+			{ $inc: { seq: 1 } },
+			{ upsert: true, returnDocument: 'after' }
+		);
+		return doc;
 	}
 
-	process(collection: string, request: MgRequest, permissions: string): Promise<MgResult>;
-	process(collection: string, request: MgRequest, permissions: string, callback: MgCallback): void;
+	async process(collection: string, request: MgRequest, permissions: string): Promise<MgResult> {
+		return docProcess(this.link, collection, request, permissions);
+	}
 
-	// tslint:disable-next-line: promise-function-async
-	process(collection: string, request: MgRequest, permissions: string, callback?: MgCallback): Promise<MgResult> | void {
-		if (callback) {
-			docProcess(this.link, collection, request, permissions, callback);
-		} else {
-			return new Promise((resolve, reject) => {
-				docProcess(this.link, collection, request, permissions, (data, response) => {
-					resolve({
-						data,
-						response
-					});
-				});
-			});
-		}
+	read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined {
+		return read(this.link, collection, request);
 	}
-	read(collection: string, request: MgRequestRead, callback?: MgCallback): FindCursor | AggregationCursor | undefined {
-		const cursor = read.read(this.link, collection, request);
-		if (callback) {
-			cursor.next((err: any, doc: any) => {
-				callback(doc);
-			});
-		}
 
-		return cursor;
+	async set(collection: string, request: MgRequest): Promise<MgResult> {
+		return set.set(this.link, collection, request);
 	}
-	set(collection: string, request: MgRequest, callback: MgCallback): void {
-		set.set(this.link, collection, request, callback);
+
+	async transition(collection: string, request: MgRequest, userRoles: Array<string> = []): Promise<MgResult> {
+		return operationTransition.transition(this.link, collection, request, userRoles);
 	}
-	write(collection: string, request: MgRequest, callback: MgCallback): void {
-		write.write(this.link, collection, request, callback);
+
+	async write(collection: string, request: MgRequest): Promise<MgResult> {
+		return write.write(this.link, collection, request);
 	}
 }

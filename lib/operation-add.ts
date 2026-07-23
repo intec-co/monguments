@@ -1,13 +1,13 @@
-import { Collection, MongoError } from 'mongodb';
-import { checkData } from './check-data';
+import { Collection } from 'mongodb';
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgRequest } from './interfaces';
+import { MgCollectionProperties, MgRequest, MgResult } from './interfaces';
+import { validateDocumentData } from './query-validator';
 
 class OperationAdd {
-	private write(
+	private async write(
 		coll: Collection, conf: MgCollectionProperties, request: MgRequest,
-		opened: boolean, toClosed: boolean, callback: MgCallback
-	): void {
+		opened: boolean, toClosed: boolean, customQuery?: any
+	): Promise<MgResult> {
 		const update: any = {};
 		const push: any = {};
 		const date = new Date().getTime();
@@ -29,10 +29,9 @@ class OperationAdd {
 		properties = (opened) ? conf.add : conf.addClosed;
 		if (properties) {
 			if (properties === '*') {
-				const add = request.data.add;
-				for (const prop in add) {
-					if (add.hasOwnProperty(prop)) {
-
+				const addData = request.data.add;
+				for (const prop in addData) {
+					if (addData.hasOwnProperty(prop)) {
 						push[prop] = request.data.add[prop];
 						if (typeof push[prop] === 'object') {
 							push[prop][p.w] = w;
@@ -53,75 +52,85 @@ class OperationAdd {
 			}
 
 			update.$push = push;
-			coll.updateOne(request.data.query, update, { upsert: false }, err => {
-				if (err) {
-					callback(undefined, { error: 'ha ocurrido un error', msg: 'error mongo.add document' });
-				} else {
-					callback(undefined, { msg: 'información guardada' });
+			const queryToUse = customQuery || request.data.query;
+			try {
+				const result = await coll.updateOne(queryToUse, update, { upsert: false });
+				if (customQuery) {
+					const isMatched = result && (
+						result.matchedCount > 0 ||
+						result.modifiedCount > 0 ||
+						(!('matchedCount' in result) && !('modifiedCount' in result))
+					);
+					if (isMatched) {
+						return { response: { msg: 'información guardada' } };
+					}
+					return { response: { error: 'not_matched' } };
 				}
-			});
+				return { response: { msg: 'información guardada' } };
+			} catch (err) {
+				return { response: { error: 'ha ocurrido un error', msg: 'error mongo.add document' } };
+			}
 		} else {
-			callback(undefined, { error: 'no se puede procesar la solicitud' });
+			return { response: { error: 'no se puede procesar la solicitud' } };
 		}
-
 	}
 
-	add(mongo: Link, collection: string, request: MgRequest, callback: MgCallback): void {
+	async add(mongo: Link, collection: string, request: MgRequest): Promise<MgResult> {
 		if (!request.data || !request.data.add || !request.data.query) {
-			callback(undefined, { error: 'data or query is undefined' });
-
-			return;
+			return { response: { error: 'data or query is undefined' } };
 		}
-		if (!checkData(request.data)) {
-			callback(undefined, { error: 'documento con propiedad no permitida' });
-
-			return;
+		if (!validateDocumentData(request.data).valid) {
+			return { response: { error: 'documento con propiedad no permitida' } };
 		}
 		const coll = mongo.collection(collection);
 		const conf = mongo.getCollectionProperties(collection);
 		if (conf) {
 			const p = conf.properties;
 			if (conf.closable) {
-				coll.find(request.data.query)
-					.next((err: MongoError, doc: any) => {
-						if (err) {
-							callback(undefined, { error: 'error en mongo.set' });
+				try {
+					const date = new Date().getTime();
+					const minDate = conf.closeTime >= 0 ? date - (conf.closeTime * 60000) : null;
+					const openQuery = { ...request.data.query, [p.closed]: { $ne: true } };
 
-							return;
-						}
-						if (!doc) {
-							callback(undefined, { error: 'error en mongo.set, no se encontro el documento' });
+					if (minDate !== null) {
+						openQuery[p.date] = { $gte: minDate };
+					}
 
-							return;
-						}
-						let opened = false;
-						let toClosed = false;
-						if (conf.closable) {
-							if (!doc[p.closed]) {
-								if (conf.closeTime >= 0) {
-									const milli = new Date().getTime() - doc[p.date];
-									const min = milli / 60000;
-									if (conf.closeTime > min) {
-										opened = true;
-									} else {
-										toClosed = true;
-									}
-								} else {
-									opened = true;
-								}
+					const res = await this.write(coll, conf, request, true, false, openQuery);
+					if (res.data !== undefined || (res.response && res.response.msg)) {
+						return res;
+					}
+
+					// Fallback if open query didn't match (either closed/expired or non-existent)
+					const doc = await coll.find(request.data.query).next();
+					if (!doc) {
+						return { response: { error: 'error en mongo.set, no se encontro el documento' } };
+					}
+					let opened = false;
+					let toClosed = false;
+					if (!doc[p.closed]) {
+						if (conf.closeTime >= 0) {
+							const milli = date - doc[p.date];
+							const min = milli / 60000;
+							if (conf.closeTime > min) {
+								opened = true;
 							} else {
-								// TODO to closed documets
+								toClosed = true;
 							}
+						} else {
+							opened = true;
 						}
-						// TODO verificar antes de mandar a cerrar
-						this.write(coll, conf, request, opened, toClosed, callback);
-
-						return;
-					});
+					}
+					return this.write(coll, conf, request, opened, toClosed);
+				} catch (err) {
+					return { response: { error: 'error en mongo.set' } };
+				}
 			} else {
-				this.write(coll, conf, request, true, false, callback);
+				return this.write(coll, conf, request, true, false);
 			}
 		}
+		return { response: { error: 'Colección no configurada' } };
 	}
 }
+
 export const add = new OperationAdd();

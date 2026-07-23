@@ -1,12 +1,18 @@
-import { Collection, Db, MongoError } from 'mongodb';
-import { checkData } from './check-data';
+import { Collection, Db } from 'mongodb';
 import { Link } from './db-link';
-import { MgCallback, MgCollectionProperties, MgRequest, MgResponse, MgW } from './interfaces';
+import { MgCollectionProperties, MgRequest, MgResponse, MgResult, MgW } from './interfaces';
+import { validateDocumentData } from './query-validator';
 
 class OperationWrite {
-	private getId(counters: Collection, collection: string, callback: (err: MongoError, data: any) => void): void {
-		counters.findOneAndUpdate({ _id: collection }, { $inc: { seq: 1 } }, { returnDocument: 'after', upsert: true }, callback);
+	private async getId(counters: Collection, collection: string): Promise<any> {
+		const result = await counters.findOneAndUpdate(
+			{ _id: collection as any },
+			{ $inc: { seq: 1 } },
+			{ returnDocument: 'after', upsert: true }
+		);
+		return result;
 	}
+
 	private writeMode(conf: MgCollectionProperties, data: any, doc: any): string {
 		const p = conf.properties;
 		if (conf.closable) {
@@ -45,7 +51,7 @@ class OperationWrite {
 			}
 			let dTime = data[p.w].date;
 			dTime = dTime - doc[p.w].date;
-			const timeEdit = conf.versionTime * 60000; // Conversion a milisegundos
+			const timeEdit = conf.versionTime * 60000;
 			if (dTime < timeEdit) {
 				return 'updateVersion';
 			}
@@ -55,76 +61,78 @@ class OperationWrite {
 
 		return 'overwrite';
 	}
-	private updateVersion(coll: Collection, conf: MgCollectionProperties, query: any, data: any, doc: any, callback: MgCallback): void {
-		const p = conf.properties;
-		Object.getOwnPropertyNames(data)
-			.forEach((val, idx, array) => {
-				if (val.indexOf('$') >= 0) {
-					callback(undefined, { error: `${val} property isn't permitted` });
 
-					return;
-				}
-			});
-		if (data[p.w].user !== doc[p.w].user) {// ToDo cambiar a propieatario
-			this.newVersion(coll, conf, query, data, doc, callback);
+	private async updateVersion(coll: Collection, conf: MgCollectionProperties, query: any, data: any, doc: any): Promise<MgResult> {
+		const p = conf.properties;
+		for (const val of Object.getOwnPropertyNames(data)) {
+			if (val.indexOf('$') >= 0) {
+				return { response: { error: `${val} property isn't permitted` } };
+			}
+		}
+		if (data[p.w].user !== doc[p.w].user) {
+			return this.newVersion(coll, conf, query, data, doc);
 		}
 		data[conf.properties.isLast] = true;
-		coll.replaceOne(query, data, { upsert: false }, (err, result) => {
-			if (err) {
-				callback(undefined, { error: 'ha ocurrido un error', msg: 'operations update' });
-			} else {
-				if (result.modifiedCount > 0) {
-					callback({ data: result.modifiedCount });
-				} else {
-					callback({ data: 0 });
-				}
+		try {
+			const result = await coll.replaceOne(query, data, { upsert: false });
+			if (result.modifiedCount > 0) {
+				return { data: result.modifiedCount };
 			}
-		});
+			return { data: 0 };
+		} catch (err) {
+			return { response: { error: 'ha ocurrido un error', msg: 'operations update' } };
+		}
 	}
-	private newVersion(
+
+	private async newVersion(
 		coll: Collection, conf: MgCollectionProperties,
-		query: any, data: any, doc: any, callback: (data: any, result?: MgResponse) => void
-	): void {
+		query: any, data: any, doc: any
+	): Promise<MgResult> {
 		const p = conf.properties;
 		query[p.isLast] = true;
 		data[p.isLast] = true;
+		const replaceQuery = doc._id ? { _id: doc._id } : query;
 		if (conf.versionField) {
 			data[conf.id] = doc[conf.id];
 			const queryReplace: any = {};
-			queryReplace[conf.id] = doc[conf.id];
-			coll.replaceOne(query, data, err => {
-				if (err) {
-					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos rpl' });
-				} else {
-					delete doc[conf.id];
-					doc[p.isLast] = false;
-					coll.insertOne(doc, errInsert => {
-						if (errInsert) {
-							callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
-						} else {
-							callback(undefined, { msg: 'Se han guardado los cambios' });
-						}
-					});
-				}
-			});
+			queryReplace[conf.versionField] = doc[conf.versionField];
+			try {
+				delete doc[conf.id];
+				doc[p.isLast] = false;
+				delete doc._id;
+				delete doc[p.date];
+
+				queryReplace[p.isLast] = true;
+				const bulkOps: any[] = [
+					{ replaceOne: { filter: replaceQuery, replacement: data } },
+					{ updateMany: { filter: queryReplace, update: { $set: { [p.isLast]: false } } } },
+					{ insertOne: { document: doc } }
+				];
+				await coll.bulkWrite(bulkOps);
+				const obj: any = {};
+				obj[conf.id] = data[conf.id];
+				return { data: obj, response: { msg: 'datos versionados' } };
+			} catch (err) {
+				return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos rpl' } };
+			}
 		} else {
-			const $set = {}
-			$set[p.isLast] = false;
-			coll.updateMany(query, { $set }, { upsert: false }, err => {
-				if (err) {
-					callback(undefined, { error: 'ha ocurrido un error', msg: 'error al versionar documentos => mongoOpWrite' });
-				}
-				coll.insertOne(data, (errInsert, result) => {
-					if (errInsert) {
-						callback(undefined, { error: 'ha ocurrido un error', msg: 'error al insertar documento => mongoOpWrite' });
-					} else {
-						callback(undefined, { msg: 'Se han guardado los cambios' });
-					}
-				});
-			});
+			try {
+				delete doc._id;
+				delete doc[p.date];
+				doc[p.isLast] = false;
+				const bulkOps: any[] = [
+					{ replaceOne: { filter: replaceQuery, replacement: data } },
+					{ insertOne: { document: doc } }
+				];
+				await coll.bulkWrite(bulkOps);
+				return { data: data, response: { msg: 'datos versionados' } };
+			} catch (err) {
+				return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos' } };
+			}
 		}
 	}
-	private newDoc(db: Db, collection: string, conf: MgCollectionProperties, data: any, callback: MgCallback): void {
+
+	private async newDoc(db: Db, collection: string, conf: MgCollectionProperties, data: any): Promise<MgResult> {
 		const p = conf.properties;
 		const idColl = conf.id;
 		const coll = db.collection(collection);
@@ -134,76 +142,66 @@ class OperationWrite {
 		}
 		data[p.isLast] = true;
 		if (conf.idAuto) {
-			this.getId(db.collection('counters'), collection, (err, doc) => {
-				data[idColl] = doc.value.seq;
+			try {
+				const docCounter = await this.getId(db.collection('counters'), collection);
+				const seq = docCounter?.value ? docCounter.value.seq : docCounter?.seq || 1;
+				data[idColl] = seq;
 				if (conf.versionField) {
-					data[conf.versionField] = doc.value.seq;
+					data[conf.versionField] = seq;
 				}
-				coll.insertOne(data, (errInsert, result) => {
-					if (errInsert) {
-						callback(undefined, { error: 'errInsert' });
-					} else {
-						if (callback !== undefined) {
-							const obj = {};
-							obj[idColl] = doc.value.seq;
-							callback(obj, { msg: 'Los datos fueron guardados' });
-						}
-					}
-				});
-			});
+				await coll.insertOne(data);
+				const obj: any = {};
+				obj[idColl] = seq;
+				return { data: obj, response: { msg: 'Los datos fueron guardados' } };
+			} catch (err) {
+				return { response: { error: 'errInsert' } };
+			}
 		} else if (data[idColl]) {
 			if (conf.versionField) {
 				data[conf.versionField] = data[idColl];
 			}
-			coll.insertOne(data, (error, result) => {
-				if (error) {
-					callback(undefined, { error: 'ha ocurrido un error' });
-				} else {
-					if (callback !== undefined) {
-						callback(result);
-					}
-				}
-			});
+			try {
+				const result = await coll.insertOne(data);
+				return { data: result };
+			} catch (error) {
+				return { response: { error: 'ha ocurrido un error' } };
+			}
 		} else {
-			callback(undefined, { error: 'new document whitout idAuto' });
+			return { response: { error: 'new document whitout idAuto' } };
 		}
 	}
 
-	private overwrite(coll: Collection, conf: MgCollectionProperties, query: any, data: any, callback: MgCallback): void {
-		Object.getOwnPropertyNames(data)
-			.forEach((val, idx, array) => {
-				if (val.indexOf('$') >= 0) {
-					callback(undefined, { error: `${val} property isn't permited` });
-
-					return;
-				}
-			});
-		coll.replaceOne(query, data, { upsert: false }, (err, result) => {
-			if (err) {
-				callback(undefined, { error: 'ha ocurrido un error', msg: 'operations overwrite' });
-			} else {
-				if (result.modifiedCount > 0) {
-					callback(result.modifiedCount, { msg: 'Los datos fueron guardados' });
-				} else {
-					callback(0, { msg: 'Los datos fueron guardados' });
-				}
+	private async overwrite(coll: Collection, conf: MgCollectionProperties, query: any, data: any): Promise<MgResult> {
+		for (const val of Object.getOwnPropertyNames(data)) {
+			if (val.indexOf('$') >= 0) {
+				return { response: { error: `${val} property isn't permitted` } };
 			}
-		});
+		}
+		try {
+			const result = await coll.replaceOne(query, data, { upsert: false });
+			if (result.modifiedCount > 0) {
+				return { data: result.modifiedCount, response: { msg: 'Los datos fueron guardados' } };
+			} else {
+				return { data: 0, response: { msg: 'Los datos fueron guardados' } };
+			}
+		} catch (err) {
+			return { response: { error: 'ha ocurrido un error', msg: 'operations overwrite' } };
+		}
 	}
-	private close(coll: Collection, conf: MgCollectionProperties, query: any, w: MgW, callback: MgCallback): void {
+
+	private async closeDoc(coll: Collection, conf: MgCollectionProperties, query: any, w: MgW): Promise<MgResult> {
 		const p = conf.properties;
 		const set: any = { _wClose: w };
 		set[p.closed] = true;
-		coll.updateOne(query, { $set: set }, { upsert: false }, err => {
-			if (err) {
-				callback(undefined, { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' });
-			} else {
-				callback(undefined, { msg: 'documento cerrado por tiempo' });
-			}
-		});
+		try {
+			await coll.updateOne(query, { $set: set }, { upsert: false });
+			return { response: { msg: 'documento cerrado por tiempo' } };
+		} catch (err) {
+			return { response: { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' } };
+		}
 	}
 
-	write(mongo: Link, collection: string, request: MgRequest, callback: MgCallback): void {
+	async write(mongo: Link, collection: string, request: MgRequest): Promise<MgResult> {
 		const conf: MgCollectionProperties | undefined = mongo.getCollectionProperties(collection);
 		if (conf) {
 			const p = conf.properties;
@@ -213,27 +211,19 @@ class OperationWrite {
 				ips: request.ips
 			};
 			if (request.data === undefined) {
-				callback(undefined, { error: 'data undefined' });
-
-				return;
+				return { response: { error: 'data undefined' } };
 			}
-			if (!checkData(request.data)) {
-				callback(undefined, { error: 'documento con propiedad no permitida' });
-
-				return;
+			if (!validateDocumentData(request.data).valid) {
+				return { response: { error: 'documento con propiedad no permitida' } };
 			}
 			const idColl = mongo.getCollectionId(collection);
 			if (!idColl) {
-				callback(undefined, { error: 'id collection undefined' });
-
-				return;
+				return { response: { error: 'id collection undefined' } };
 			}
 			if (conf.required.length > 0) {
 				for (const prop of conf.required) {
-					if (request.data[prop] === undefined || request.data[prop] === undefined) {
-						callback(undefined, { error: `property ${prop} es required` });
-
-						return;
+					if (request.data[prop] === undefined) {
+						return { response: { error: `property ${prop} es required` } };
 					}
 				}
 			}
@@ -247,9 +237,7 @@ class OperationWrite {
 			} else if (conf.idAuto) {
 				action = 'newDoc';
 			} else {
-				callback(undefined, { error: 'new document without idAuto' });
-
-				return;
+				return { response: { error: 'new document without idAuto' } };
 			}
 			if (conf.id !== '_id' && request.data._id) {
 				delete request.data._id;
@@ -258,42 +246,39 @@ class OperationWrite {
 			data[p.w] = w;
 			switch (action) {
 				case 'newDoc':
-					this.newDoc(mongo.db, collection, conf, data, callback);
-					break;
+					return this.newDoc(mongo.db, collection, conf, data);
 				case 'findDoc':
 					const coll = mongo.collection(collection);
-					coll.find(query)
-						.next((err: MongoError, doc: any) => {
-							if (err) {
-								callback(undefined, { error: 'ha ocurrido un error', msg: 'findDoc => mongoOpWrite' });
-							} else if (doc) {
-								const wm = this.writeMode(conf, data, doc);
-								switch (wm) {
-									case 'overwrite':
-										this.overwrite(coll, conf, query, data, callback);
-										break;
-									case 'updateVersion':
-										this.updateVersion(coll, conf, query, data, doc, callback);
-										break;
-									case 'newVersion':
-										this.newVersion(coll, conf, query, data, doc, callback);
-										break;
-									case 'close':
-										this.close(coll, conf, query, w, callback);
-										break;
-									case 'unfair':
-										callback(undefined, { error: 'write unfair' });
-										break;
-									default:
-								}
-							} else if (!conf.idAuto) {
-								this.newDoc(mongo.db, collection, conf, data, callback);
+					try {
+						const doc = await coll.find(query).next();
+						if (doc) {
+							const wm = this.writeMode(conf, data, doc);
+							switch (wm) {
+								case 'overwrite':
+									return this.overwrite(coll, conf, query, data);
+								case 'updateVersion':
+									return this.updateVersion(coll, conf, query, data, doc);
+								case 'newVersion':
+									return this.newVersion(coll, conf, query, data, doc);
+								case 'close':
+									return this.closeDoc(coll, conf, query, w);
+								case 'unfair':
+									return { response: { error: 'write unfair' } };
+								default:
+									return { response: { error: 'write mode unknown' } };
 							}
-						});
+						} else if (!conf.idAuto) {
+							return this.newDoc(mongo.db, collection, conf, data);
+						}
+					} catch (err) {
+						return { response: { error: 'ha ocurrido un error', msg: 'findDoc => mongoOpWrite' } };
+					}
 					break;
 				default:
 			}
 		}
+		return { response: { error: 'Colección no configurada' } };
 	}
 }
+
 export const write = new OperationWrite();

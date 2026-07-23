@@ -1,4 +1,4 @@
-import { MgCollections } from '../lib/interfaces';
+import { MgCollections } from '../../lib/interfaces';
 
 export const collsConf: MgCollections = {
 	basic: {
@@ -7,10 +7,8 @@ export const collsConf: MgCollections = {
 		closable: false,
 		closeTime: 0,
 		idAuto: true,
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -24,10 +22,8 @@ export const collsConf: MgCollections = {
 		closable: false,
 		closeTime: 0,
 		idAuto: false,
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -46,10 +42,8 @@ export const collsConf: MgCollections = {
 		add: ['addValue'],
 		set: ['setValue'],
 		owner: '_id',
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -72,8 +66,7 @@ export const collsConf: MgCollections = {
 		link: {
 			basicIdManual: true
 		},
-		properties:
-		{
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -93,10 +86,8 @@ export const collsConf: MgCollections = {
 		addClosed: ['list'],
 		setClosed: ['value'],
 		owner: '_id',
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -118,10 +109,8 @@ export const collsConf: MgCollections = {
 		set: '*',
 		add: '*',
 		owner: '_id',
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -139,12 +128,8 @@ export const collsConf: MgCollections = {
 		idAuto: true,
 		exclusive: true,
 		owner: '_id',
-		required: [
-			'value',
-			'list'
-		],
-		properties:
-		{
+		required: ['value', 'list'],
+		properties: {
 			isLast: '_isLast',
 			w: '_w',
 			closed: '_closed',
@@ -157,11 +142,10 @@ export const collsConf: MgCollections = {
 		versionTime: 0,
 		closable: false,
 		closeTime: 0,
+		id: 'id',
 		idAuto: true,
-		link: {
-		},
-		properties:
-		{
+		link: {},
+		properties: {
 			isLast: 'isLast',
 			w: 'w',
 			closed: 'closed',
@@ -170,7 +154,7 @@ export const collsConf: MgCollections = {
 		},
 		projections: [
 			{ _id: 0, id: 1, title: 1, content: 1 },
-			{ _id: 0, id: 1, title: 1, content: 1, tags: 1, views: 1 },
+			{ _id: 0, id: 1, title: 1, content: 1, tags: 1, views: 1 }
 		]
 	}
 };

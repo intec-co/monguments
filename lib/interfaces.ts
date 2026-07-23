@@ -1,16 +1,24 @@
-import { IsOptional, IsString } from 'class-validator';
-
 export class MgProperties {
-	@IsString()
 	closed: string;
-	@IsString()
 	date: string;
-	@IsString()
 	history: string;
-	@IsString()
 	isLast: string;
-	@IsString()
 	w: string;
+}
+
+export interface MgStateTransition {
+	from: string | Array<string>;
+	to: string;
+	allowedRoles?: Array<string>;
+	requiredFields?: Array<string>;
+	autoClose?: boolean;
+}
+
+export interface MgWorkflowConfig {
+	stateField?: string;
+	initialState?: string;
+	transitions: Array<MgStateTransition>;
+	versionOnTransition?: boolean;
 }
 
 export interface MgCollectionProperties {
@@ -32,6 +40,8 @@ export interface MgCollectionProperties {
 	versionField?: string;
 	upsert?: boolean;
 	projections?: any[];
+	maxLimit?: number;
+	workflow?: MgWorkflowConfig;
 }
 
 export interface MgCollections { [key: string]: MgCollectionProperties; }
@@ -55,17 +65,15 @@ export interface MgClient {
 	db: string;
 }
 export interface MgResult {
-	data: any;
-	response: MgResponse;
+	data?: any;
+	response?: MgResponse;
 }
 export interface MgResponse {
 	error?: string;
 	msg?: string;
 }
 export class MgConf {
-	@IsString()
 	uri: string;
-	@IsString()
 	db: string;
 }
 export interface MgRequest {
@@ -76,6 +84,8 @@ export interface MgRequest {
 	query?: Array<any> | any;
 	set?: Array<any> | any;
 	user: number;
+	targetState?: string;
+	roles?: Array<string>;
 }
 export interface MgRequestRead {
 	data: any;
