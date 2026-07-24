@@ -1,4 +1,4 @@
-import { MgRequest } from './interfaces';
+import { MgRequest } from './types';
 
 export const hasPermission = (permission: string, owner: string, request: MgRequest) => {
 	if (permission === 'w' || permission === 'r') {

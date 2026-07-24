@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { Monguments } from '../../lib/monguments';
+import { createMonguments, Monguments } from '../../lib/monguments';
 import { add } from '../../lib/operation-add';
 import { close } from '../../lib/operation-close';
 import { read } from '../../lib/operation-read';
@@ -14,7 +14,7 @@ vi.mock('../../lib/operation-set');
 vi.mock('../../lib/operation-write');
 vi.mock('../../lib/docs-process');
 
-describe('Monguments Class Methods Direct Unit', () => {
+describe('Monguments Client Direct Unit', () => {
 	let mockDb: any;
 	let mockCollection: any;
 	let monguments: Monguments;
@@ -35,7 +35,7 @@ describe('Monguments Class Methods Direct Unit', () => {
 			}
 		};
 
-		monguments = new Monguments(mockDb as any, collections as any);
+		monguments = createMonguments(mockDb as any, collections as any);
 	});
 
 	afterEach(() => {
@@ -43,10 +43,10 @@ describe('Monguments Class Methods Direct Unit', () => {
 	});
 
 	it('should delegate add call to operation-add', async () => {
-		(add.add as any).mockResolvedValue({ response: { msg: 'Added' } });
+		(add as any).mockResolvedValue({ response: { msg: 'Added' } });
 		const res = await monguments.add('testColl', { data: {} } as any);
 
-		expect(add.add).toHaveBeenCalled();
+		expect(add).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'Added' } });
 	});
 
@@ -67,18 +67,18 @@ describe('Monguments Class Methods Direct Unit', () => {
 	});
 
 	it('should delegate set call to operation-set', async () => {
-		(set.set as any).mockResolvedValue({ response: { msg: 'Set' } });
+		(set as any).mockResolvedValue({ response: { msg: 'Set' } });
 		const res = await monguments.set('testColl', { data: {} } as any);
 
-		expect(set.set).toHaveBeenCalled();
+		expect(set).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'Set' } });
 	});
 
 	it('should delegate write call to operation-write', async () => {
-		(write.write as any).mockResolvedValue({ response: { msg: 'Written' } });
+		(write as any).mockResolvedValue({ response: { msg: 'Written' } });
 		const res = await monguments.write('testColl', { data: {} } as any);
 
-		expect(write.write).toHaveBeenCalled();
+		expect(write).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'Written' } });
 	});
 

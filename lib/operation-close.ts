@@ -1,5 +1,5 @@
 import { Link } from './db-link';
-import { MgRequest, MgResult } from './interfaces';
+import { MgRequest, MgResult } from './types';
 import { validateQueryFilter } from './query-validator';
 
 export const close = async (mongo: Link, collection: string, request: MgRequest): Promise<MgResult> => {

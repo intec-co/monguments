@@ -1,6 +1,6 @@
 import { MongoClient } from 'mongodb';
-import { MgClient, MgConf } from './interfaces';
-import { Monguments } from './monguments';
+import { MgClient, MgConf } from './types';
+import { createMonguments, Monguments } from './monguments';
 
 export async function mgConnectDb(conf: MgConf, client: MgClient): Promise<Monguments> {
 	const collections = client.collections;
@@ -8,13 +8,13 @@ export async function mgConnectDb(conf: MgConf, client: MgClient): Promise<Mongu
 	try {
 		await mongodbClient.connect();
 		const db = mongodbClient.db(client.db);
-		return new Monguments(db, collections);
+		return createMonguments(db, collections);
 	} catch (err) {
 		console.error(err);
 		throw new Error('Could not connect to mongodb');
 	}
 }
 
-export * from './interfaces';
+export * from './types';
 export * from './monguments';
 export * from './operation-transition';

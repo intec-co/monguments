@@ -1,30 +1,27 @@
 import { Collection, Db } from 'mongodb';
-import { MgCollectionProperties, MgCollections } from './interfaces';
+import { MgCollectionProperties, MgCollections } from './types';
 
-export class Link {
-	private readonly _db: Db;
-	private readonly _collections: MgCollections;
-	constructor(db: Db, collections: MgCollections) {
-		this._db = db;
-		this._collections = collections;
-	}
-	get db(): Db {
-		return this._db;
-	}
-	get collections(): MgCollections {
-		return this._collections;
-	}
-	collection(collection: string): Collection {
-		return this.db.collection(collection);
-	}
-	getCollectionProperties(collection: string): MgCollectionProperties | undefined {
-		if (this.collections[collection]) {
-			return this.collections[collection];
+export interface Link {
+	readonly db: Db;
+	readonly collections: MgCollections;
+	collection(collectionName: string): Collection;
+	getCollectionProperties(collectionName: string): MgCollectionProperties | undefined;
+	getCollectionId(collectionName: string): string;
+}
+
+export function createLink(db: Db, collections: MgCollections): Link {
+	const frozenCollections = Object.freeze({ ...collections });
+	return Object.freeze({
+		db,
+		collections: frozenCollections,
+		collection(collectionName: string): Collection {
+			return db.collection(collectionName);
+		},
+		getCollectionProperties(collectionName: string): MgCollectionProperties | undefined {
+			return frozenCollections[collectionName];
+		},
+		getCollectionId(collectionName: string): string {
+			return frozenCollections[collectionName]?.id;
 		}
-
-		return undefined;
-	}
-	getCollectionId(collection: string): string {
-		return this.collections[collection].id;
-	}
+	});
 }

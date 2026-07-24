@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
-import { docsSet } from '../../lib/docs-set';
-import { set } from '../../lib/operation-set';
+import { docSet } from '../../lib/docs-set';
+import * as setModule from '../../lib/operation-set';
 
 describe('DocsSet', () => {
 	let mockMongo: any;
@@ -21,7 +21,7 @@ describe('DocsSet', () => {
 			db: mockDb
 		};
 
-		vi.spyOn(set, 'set').mockResolvedValue({ response: { msg: 'información guardada' } });
+		vi.spyOn(setModule, 'set').mockResolvedValue({ response: { msg: 'información guardada' } });
 	});
 
 	afterEach(() => {
@@ -31,7 +31,7 @@ describe('DocsSet', () => {
 	describe('set', () => {
 		it('should return error response if query is undefined (data missing query field)', async () => {
 			const req: any = { data: {} };
-			const result = await docsSet.set(mockMongo, 'test', req, 'RW');
+			const result = await docSet(mockMongo, 'test', req, 'RW');
 			expect(result).toEqual({ response: { error: 'query undefined' } });
 		});
 
@@ -44,11 +44,11 @@ describe('DocsSet', () => {
 				.mockResolvedValueOnce([{ _id: 2 }]);
 			mockCollection.find.mockReturnValue({ toArray: toArrayMock });
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'RW');
+			const result = await docSet(mockMongo, 'test', req, 'RW');
 
 			expect(result.data).toBeDefined();
 			expect(result.data.length).toBe(4);
-			expect(set.set).toHaveBeenCalledTimes(2);
+			expect(setModule.set).toHaveBeenCalledTimes(2);
 		});
 
 		it('should process array of queries inside single data payload', async () => {
@@ -60,10 +60,10 @@ describe('DocsSet', () => {
 				.mockResolvedValueOnce([{ _id: 2 }]);
 			mockCollection.find.mockReturnValue({ toArray: toArrayMock });
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'RW');
+			const result = await docSet(mockMongo, 'test', req, 'RW');
 
 			expect(result.data).toBeDefined();
-			expect(set.set).toHaveBeenCalledTimes(2);
+			expect(setModule.set).toHaveBeenCalledTimes(2);
 		});
 
 		it('should process single query object correctly', async () => {
@@ -73,17 +73,17 @@ describe('DocsSet', () => {
 			const toArrayMock = vi.fn().mockResolvedValue([{ _id: 1 }]);
 			mockCollection.find.mockReturnValue({ toArray: toArrayMock });
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'RW');
+			const result = await docSet(mockMongo, 'test', req, 'RW');
 
 			expect(result).toEqual({ data: undefined, response: { msg: 'información guardada' } });
-			expect(set.set).toHaveBeenCalledTimes(1);
+			expect(setModule.set).toHaveBeenCalledTimes(1);
 		});
 	});
 
 	describe('setOne permission and collection validation', () => {
 		it('should return permission error if write permissions are absent', async () => {
 			const req: any = { data: { query: { id: 1 } } };
-			const result = await docsSet.set(mockMongo, 'test', req, 'R-');
+			const result = await docSet(mockMongo, 'test', req, 'R-');
 			expect(result).toEqual({ data: undefined, response: { error: 'No tiene permisos para esta operación' } });
 		});
 
@@ -91,7 +91,7 @@ describe('DocsSet', () => {
 			const req: any = { data: { query: { id: 1 } } };
 			mockMongo.getCollectionProperties.mockReturnValue(undefined);
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'Rw');
+			const result = await docSet(mockMongo, 'test', req, 'Rw');
 			expect(result).toEqual({ data: undefined, response: { error: 'Colección no configurada' } });
 		});
 
@@ -99,29 +99,29 @@ describe('DocsSet', () => {
 			const req: any = { user: 'user1', data: { query: { ownerField: 'user2' } } };
 			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'ownerField' });
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'Rw');
+			const result = await docSet(mockMongo, 'test', req, 'Rw');
 			expect(result).toEqual({ data: undefined, response: { error: 'No tiene permisos para esta operación' } });
 		});
 
-		it('should delegate to set.set for versionable collections', async () => {
+		it('should delegate to set for versionable collections', async () => {
 			const req: any = { data: { query: { id: 1 } } };
 			mockMongo.getCollectionProperties.mockReturnValue({
 				versionable: true,
 				properties: { isLast: 'isLastField' }
 			});
 
-			await docsSet.set(mockMongo, 'test', req, 'RW');
+			await docSet(mockMongo, 'test', req, 'RW');
 
-			expect(set.set).toHaveBeenCalledWith(mockMongo, 'test', req);
+			expect(setModule.set).toHaveBeenCalledWith(mockMongo, 'test', req);
 		});
 
-		it('should return error response when set.set throws database error', async () => {
+		it('should return error response when set throws database error', async () => {
 			const req: any = { data: { query: { id: 1 } } };
 			mockMongo.getCollectionProperties.mockReturnValue({ versionable: false });
 
-			(set.set as any).mockRejectedValue(new Error('db connection lost'));
+			(setModule.set as any).mockRejectedValue(new Error('db connection lost'));
 
-			const result = await docsSet.set(mockMongo, 'test', req, 'RW');
+			const result = await docSet(mockMongo, 'test', req, 'RW');
 			expect(result).toEqual({ data: undefined, response: { error: 'Error en docs set' } });
 		});
 
@@ -129,9 +129,8 @@ describe('DocsSet', () => {
 			const req: any = { data: { query: { id: 1 } } };
 			mockMongo.getCollectionProperties.mockReturnValue({ versionable: false, upsert: true });
 
-			await docsSet.set(mockMongo, 'test', req, 'RW');
-			expect(set.set).toHaveBeenCalledTimes(1);
+			await docSet(mockMongo, 'test', req, 'RW');
+			expect(setModule.set).toHaveBeenCalledTimes(1);
 		});
 	});
 });
-

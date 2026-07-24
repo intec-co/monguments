@@ -1,7 +1,7 @@
 import { AggregationCursor, FindCursor } from 'mongodb';
 import { validateQueryFilter, validateReadParams } from './query-validator';
 import { Link } from './db-link';
-import { MGParamsRead, MgRequestRead } from './interfaces';
+import { MGParamsRead, MgRequestRead } from './types';
 
 function readAggregation(mongo: Link, collection: string, query: any, params: MGParamsRead): AggregationCursor {
 	const aggregation = [];

@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MgCollectionProperties } from '../../lib/interfaces';
-import { Monguments } from '../../lib/monguments';
+import { createMonguments, Monguments } from '../../lib/monguments';
 import { collsConf } from './collections';
 
 export class MongumentsMock {
@@ -16,7 +16,7 @@ export class MongumentsMock {
 		this.connection = await MongoClient.connect(mongoUri, {});
 		const dbName = this.mongoServer.instanceInfo?.dbName || 'test_db';
 		const db = this.connection.db(dbName);
-		return new Monguments(db, this.collections);
+		return createMonguments(db, this.collections);
 	}
 
 	getCollections(): { [key: string]: MgCollectionProperties } {

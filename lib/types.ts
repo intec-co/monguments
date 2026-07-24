@@ -1,4 +1,4 @@
-export class MgProperties {
+export type MgProperties = {
 	closed: string;
 	date: string;
 	history: string;
@@ -6,22 +6,22 @@ export class MgProperties {
 	w: string;
 }
 
-export interface MgStateTransition {
+export type MgStateTransition = {
 	from: string | Array<string>;
 	to: string;
-	allowedRoles?: Array<string>;
+	allowedActions?: Array<string>;
 	requiredFields?: Array<string>;
 	autoClose?: boolean;
 }
 
-export interface MgWorkflowConfig {
+export type MgWorkflowConfig = {
 	stateField?: string;
 	initialState?: string;
 	transitions: Array<MgStateTransition>;
 	versionOnTransition?: boolean;
 }
 
-export interface MgCollectionProperties {
+export type MgCollectionProperties = {
 	add?: Array<string> | '*';
 	addClosed?: Array<string> | '*';
 	closable?: boolean;
@@ -44,9 +44,9 @@ export interface MgCollectionProperties {
 	workflow?: MgWorkflowConfig;
 }
 
-export interface MgCollections { [key: string]: MgCollectionProperties; }
+export type MgCollections = { [key: string]: MgCollectionProperties; }
 
-export interface MgNameDocProperties {
+export type MgNameDocProperties = {
 	closed: string;
 	date: string;
 	history: string;
@@ -54,29 +54,29 @@ export interface MgNameDocProperties {
 	w: string;
 }
 
-export interface MgW {
+export type MgW = {
 	date: number;
 	id: number;
 	ips?: Array<string>;
 }
 
-export interface MgClient {
+export type MgClient = {
 	collections: any;
 	db: string;
 }
-export interface MgResult {
+export type MgResult = {
 	data?: any;
 	response?: MgResponse;
 }
-export interface MgResponse {
+export type MgResponse = {
 	error?: string;
 	msg?: string;
 }
-export class MgConf {
+export type MgConf = {
 	uri: string;
 	db: string;
 }
-export interface MgRequest {
+export type MgRequest = {
 	data: any;
 	ips?: Array<string>;
 	operation?: string;
@@ -84,15 +84,13 @@ export interface MgRequest {
 	query?: Array<any> | any;
 	set?: Array<any> | any;
 	user: number;
-	targetState?: string;
-	roles?: Array<string>;
 }
-export interface MgRequestRead {
+export type MgRequestRead = {
 	data: any;
 	params?: MGParamsRead;
 }
 
-export interface MGParamsRead {
+export type MGParamsRead = {
 	limit?: number;
 	link?: Array<MgLink>;
 	lookup?: MongoLookup | MongoLookupPipeLine | Array<MongoLookup | MongoLookupPipeLine>;
@@ -101,7 +99,7 @@ export interface MGParamsRead {
 	sort?: any;
 }
 
-export interface MgLink {
+export type MgLink = {
 	collection: string;
 	from: string;
 	query?: string;
@@ -109,14 +107,14 @@ export interface MgLink {
 	asArray?: boolean;
 }
 
-export interface MongoLookup {
+export type MongoLookup = {
 	as: string;
 	foreignField: string;
 	from: string;
 	localField: string;
 }
 
-export interface MongoLookupPipeLine {
+export type MongoLookupPipeLine = {
 	as: string;
 	from: string;
 	let: string;
@@ -124,3 +122,8 @@ export interface MongoLookupPipeLine {
 }
 
 export type MgCallback = (data: any, result?: MgResponse) => void;
+
+export type AdvancedPermission = {
+	operation: string;
+	value: string[];
+}

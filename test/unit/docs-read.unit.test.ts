@@ -1,5 +1,5 @@
 import { vi, Mock } from 'vitest';
-import { docsRead } from '../../lib/docs-read';
+import { readDoc, readList } from '../../lib/docs-read';
 import { read } from '../../lib/operation-read';
 import { hasPermission } from '../../lib/has-permission';
 import { MgRequest } from '../../lib/interfaces';
@@ -35,7 +35,7 @@ describe('DocsRead', () => {
 		it('should return error response when collection is not configured', async () => {
 			mockMongo.getCollectionProperties.mockReturnValue(undefined);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: 'Colección no configurada' } });
 		});
@@ -44,7 +44,7 @@ describe('DocsRead', () => {
 			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
 			(hasPermission as Mock).mockReturnValue(false);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
 		});
@@ -59,7 +59,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: mockError.message } });
 		});
@@ -73,7 +73,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { msg: 'No se encontraron documentos' } });
 		});
@@ -88,7 +88,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ data: mockDoc });
 		});
@@ -114,7 +114,7 @@ describe('DocsRead', () => {
 
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(mockReq.params!.lookup).toEqual([
 				{
@@ -143,7 +143,7 @@ describe('DocsRead', () => {
 
 			mockReq.params = undefined as any;
 
-			await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r-1');
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r-1');
 
 			expect(mockReq.params!.project).toBe('proj2');
 		});
@@ -164,7 +164,7 @@ describe('DocsRead', () => {
 
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ data: { id: 1, linkedId: 'abc' } });
 			expect(consoleSpy).toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe('DocsRead', () => {
 			const mockCursor = { next: vi.fn().mockResolvedValue(mockDocWithLinkedArray) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(mockReq.params!.lookup).toEqual([
 				{
@@ -227,7 +227,7 @@ describe('DocsRead', () => {
 			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(Array.isArray(mockReq.params!.lookup)).toBe(true);
 			expect(mockReq.params!.lookup).toHaveLength(3);
@@ -239,7 +239,7 @@ describe('DocsRead', () => {
 		it('should return error response when collection is not configured', async () => {
 			mockMongo.getCollectionProperties.mockReturnValue(undefined);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: 'Colección no configurada' } });
 		});
@@ -248,7 +248,7 @@ describe('DocsRead', () => {
 			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
 			(hasPermission as Mock).mockReturnValue(false);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
 		});
@@ -263,7 +263,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { error: mockError.message } });
 		});
@@ -277,7 +277,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ response: { msg: 'No se encontraron documentos' } });
 		});
@@ -292,7 +292,7 @@ describe('DocsRead', () => {
 			};
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(result).toEqual({ data: mockArray });
 		});
@@ -318,7 +318,7 @@ describe('DocsRead', () => {
 
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(mockReq.params!.lookup).toEqual([
 				{
@@ -354,7 +354,7 @@ describe('DocsRead', () => {
 			const mockCursor = { toArray: vi.fn().mockResolvedValue(mockArrayWithLinked) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const result = await docsRead.readList(mockMongo as any, 'testColl', mockReq, 'r--');
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(mockReq.params!.lookup).toEqual([
 				{
@@ -389,7 +389,7 @@ describe('DocsRead', () => {
 			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(mockReq.params!.lookup).toBeDefined();
 		});
@@ -416,7 +416,7 @@ describe('DocsRead', () => {
 			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			await docsRead.read(mockMongo as any, 'testColl', mockReq, 'r--');
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
 			expect(consoleSpy).toHaveBeenCalledWith('catch in parse link query');
 			consoleSpy.mockRestore();

@@ -49,28 +49,28 @@ describe('OperationWrite Unit', () => {
 
 	it('should return error response when request.data is undefined', async () => {
 		mockMongo.getCollectionProperties.mockReturnValue({ properties: { w: 'w' } });
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [] } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [] } as any);
 		expect(res).toEqual({ response: { error: 'data undefined' } });
 	});
 
 	it('should return error response when checkData returns false for unpermitted $ properties', async () => {
 		mockMongo.getCollectionProperties.mockReturnValue({ properties: { w: 'w' } });
 		(queryValidatorModule.validateDocumentData as Mock).mockReturnValue({ valid: false, reason: 'documento con propiedad no permitida' });
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: {} } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: {} } as any);
 		expect(res).toEqual({ response: { error: 'documento con propiedad no permitida' } });
 	});
 
 	it('should return error response when getCollectionId returns undefined', async () => {
 		mockMongo.getCollectionProperties.mockReturnValue({ properties: { w: 'w' }, required: [] });
 		mockMongo.getCollectionId.mockReturnValue(undefined);
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: {} } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: {} } as any);
 		expect(res).toEqual({ response: { error: 'id collection undefined' } });
 	});
 
 	it('should return error response when a required property is missing from payload', async () => {
 		mockMongo.getCollectionProperties.mockReturnValue({ properties: { w: 'w' }, required: ['name'] });
 		mockMongo.getCollectionId.mockReturnValue('id');
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { other: 1 } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { other: 1 } } as any);
 		expect(res).toEqual({ response: { error: 'property name es required' } });
 	});
 
@@ -81,7 +81,7 @@ describe('OperationWrite Unit', () => {
 		mockCountersCollection.findOneAndUpdate.mockResolvedValue({ value: { seq: 1 } });
 		mockCollection.insertOne.mockResolvedValue({ insertedId: 1 });
 
-		await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { _id: 'someId', name: 'test' } } as any);
+		await write(mockMongo, 'test', { user: 'u1', ips: [], data: { _id: 'someId', name: 'test' } } as any);
 
 		const insertedData = mockCollection.insertOne.mock.calls[0][0];
 		expect(insertedData._id).toBeUndefined();
@@ -92,7 +92,7 @@ describe('OperationWrite Unit', () => {
 		mockMongo.getCollectionId.mockReturnValue('customId');
 		mockCursor.next.mockRejectedValue(new Error('find error'));
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { customId: 123 } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { customId: 123 } } as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error', msg: 'findDoc => mongoOpWrite' } });
 	});
@@ -109,7 +109,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCollection.updateOne.mockResolvedValue({});
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123 } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123 } } as any);
 
 		expect(res).toEqual({ response: { msg: 'documento cerrado por tiempo' } });
 	});
@@ -126,7 +126,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCollection.updateOne.mockRejectedValue(new Error('update error'));
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123 } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123 } } as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' } });
 	});
@@ -142,7 +142,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCollection.replaceOne.mockResolvedValue({ modifiedCount: 0 });
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
 
 		expect(res).toEqual({ data: 0, response: { msg: 'Los datos fueron guardados' } });
 	});
@@ -158,7 +158,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCollection.replaceOne.mockRejectedValue(new Error('replace error'));
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error', msg: 'operations overwrite' } });
 	});
@@ -172,7 +172,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCursor.next.mockResolvedValue({ id: 123 });
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, $name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, $name: 'test' } } as any);
 
 		expect(res).toEqual({ response: { error: "$name property isn't permitted" } });
 	});
@@ -187,7 +187,7 @@ describe('OperationWrite Unit', () => {
 		const pastTime = new Date().getTime() - (5 * 60000);
 		mockCursor.next.mockResolvedValue({ id: 123, w: { date: pastTime, user: 'u1' } });
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, $name: 'test', w: { date: new Date().getTime(), user: 'u1' } } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, $name: 'test', w: { date: new Date().getTime(), user: 'u1' } } } as any);
 
 		expect(res).toEqual({ response: { error: "$name property isn't permitted" } });
 	});
@@ -202,7 +202,7 @@ describe('OperationWrite Unit', () => {
 		mockCountersCollection.findOneAndUpdate.mockResolvedValue({ value: { seq: 1 } });
 		mockCollection.insertOne.mockRejectedValue(new Error('insert error'));
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { name: 'test' } } as any);
 
 		expect(res).toEqual({ response: { error: 'errInsert' } });
 	});
@@ -217,7 +217,7 @@ describe('OperationWrite Unit', () => {
 		mockCursor.next.mockResolvedValue(null);
 		mockCollection.insertOne.mockRejectedValue(new Error('insert error'));
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 123, name: 'test' } } as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error' } });
 	});
@@ -231,7 +231,7 @@ describe('OperationWrite Unit', () => {
 
 		mockCursor.next.mockResolvedValue(null);
 
-		const res = await write.write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 0, name: 'test' } } as any);
+		const res = await write(mockMongo, 'test', { user: 'u1', ips: [], data: { id: 0, name: 'test' } } as any);
 
 		expect(res).toEqual({ response: { error: 'new document without idAuto' } });
 	});

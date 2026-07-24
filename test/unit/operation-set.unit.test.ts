@@ -27,8 +27,8 @@ describe('OperationSet Unit', () => {
 	});
 
 	it('should return error when data, set, or query is missing', async () => {
-		const res1 = await set.set(mockMongo, 'test', {} as any);
-		const res2 = await set.set(mockMongo, 'test', { data: { set: { val: 1 } } } as any);
+		const res1 = await set(mockMongo, 'test', {} as any);
+		const res2 = await set(mockMongo, 'test', { data: { set: { val: 1 } } } as any);
 
 		expect(res1).toEqual({ response: { error: 'data or query is undefined' } });
 		expect(res2).toEqual({ response: { error: 'data or query is undefined' } });
@@ -38,7 +38,7 @@ describe('OperationSet Unit', () => {
 		vi.spyOn(queryValidatorModule, 'validateDocumentData').mockReturnValue({ valid: false, reason: 'documento con propiedad no permitida' });
 		const req = { data: { set: { val: 1 }, query: { id: 1 } } };
 
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 		expect(res).toEqual({ response: { error: 'documento con propiedad no permitida' } });
 	});
 
@@ -46,7 +46,7 @@ describe('OperationSet Unit', () => {
 		mockMongo.getCollectionProperties.mockReturnValue(undefined);
 		const req = { data: { set: { val: 1 }, query: { id: 1 } } };
 
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 		expect(res).toEqual({ response: { error: 'Colección no configurada' } });
 	});
 
@@ -59,7 +59,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.updateOne.mockResolvedValue({});
 
 		const req = { data: { set: { val: 10, unpermitted: 20 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(mockCollection.updateOne).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'información guardada' } });
@@ -74,7 +74,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.updateOne.mockRejectedValue(new Error('db update failed'));
 
 		const req = { data: { set: { val: 10 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error', msg: 'error mongo.set document' } });
 	});
@@ -87,7 +87,7 @@ describe('OperationSet Unit', () => {
 		});
 
 		const req = { data: { set: { otherProp: 10 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: '$set is empty' } });
 	});
@@ -102,7 +102,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.findOne.mockResolvedValue({ _w: { id: 'ownerId' } });
 
 		const req = { data: { set: { val: 1 }, query: { id: 1 } }, user: 'otherUser' };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'Usuario no es propietario del documento' } });
 	});
@@ -120,7 +120,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.updateOne.mockResolvedValue({});
 
 		const req = { data: { set: { val: 1 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(mockCollection.updateOne).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'información guardada' } });
@@ -135,7 +135,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.findOne.mockResolvedValue(null);
 
 		const req = { data: { set: { val: 1 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'error en mongo.set, no se encontró el documento' } });
 	});
@@ -149,7 +149,7 @@ describe('OperationSet Unit', () => {
 		mockCollection.findOne.mockRejectedValue(new Error('db find error'));
 
 		const req = { data: { set: { val: 1 }, query: { id: 1 } } };
-		const res = await set.set(mockMongo, 'test', req as any);
+		const res = await set(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'error en mongo.set' } });
 	});

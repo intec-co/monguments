@@ -1,26 +1,27 @@
 import { vi, Mock } from 'vitest';
 import { docProcess } from '../../lib/docs-process';
-import { docsWrite } from '../../lib/docs-write';
-import { docsRead } from '../../lib/docs-read';
-import { docsSet } from '../../lib/docs-set';
+import { docWrite } from '../../lib/docs-write';
+import { readDoc, readList } from '../../lib/docs-read';
+import { docSet } from '../../lib/docs-set';
 import { add } from '../../lib/operation-add';
 import { close } from '../../lib/operation-close';
 import { hasPermission } from '../../lib/has-permission';
 
 vi.mock('../../lib/docs-write', () => ({
-	docsWrite: { write: vi.fn() }
+	docWrite: vi.fn()
 }));
 
 vi.mock('../../lib/docs-read', () => ({
-	docsRead: { read: vi.fn(), readList: vi.fn() }
+	readDoc: vi.fn(),
+	readList: vi.fn()
 }));
 
 vi.mock('../../lib/docs-set', () => ({
-	docsSet: { set: vi.fn() }
+	docSet: vi.fn()
 }));
 
 vi.mock('../../lib/operation-add', () => ({
-	add: { add: vi.fn() }
+	add: vi.fn()
 }));
 
 vi.mock('../../lib/operation-close', () => ({
@@ -86,43 +87,43 @@ describe('DocProcess Unit', () => {
 	});
 
 	describe('Operation Delegation & Routing', () => {
-		it('should delegate write operation to docsWrite.write', async () => {
-			(docsWrite.write as Mock).mockResolvedValue({ data: { insertedId: 1 } });
+		it('should delegate write operation to docWrite', async () => {
+			(docWrite as Mock).mockResolvedValue({ data: { insertedId: 1 } });
 			const req = { data: { title: 'New' }, operation: 'write' };
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(docsWrite.write).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(docWrite).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
 			expect(res).toEqual({ data: { insertedId: 1 } });
 		});
 
-		it('should delegate read operation to docsRead.read', async () => {
-			(docsRead.read as Mock).mockResolvedValue({ data: { id: 1 } });
+		it('should delegate read operation to readDoc', async () => {
+			(readDoc as Mock).mockResolvedValue({ data: { id: 1 } });
 			const req = { data: { id: 1 }, operation: 'read' };
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(docsRead.read).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(readDoc).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
 			expect(res).toEqual({ data: { id: 1 } });
 		});
 
-		it('should delegate readList operation to docsRead.readList', async () => {
-			(docsRead.readList as Mock).mockResolvedValue({ data: [{ id: 1 }] });
+		it('should delegate readList operation to readList', async () => {
+			(readList as Mock).mockResolvedValue({ data: [{ id: 1 }] });
 			const req = { data: {}, operation: 'readList' };
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(docsRead.readList).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(readList).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
 			expect(res).toEqual({ data: [{ id: 1 }] });
 		});
 
-		it('should delegate set operation to docsSet.set', async () => {
-			(docsSet.set as Mock).mockResolvedValue({ response: { msg: 'ok' } });
+		it('should delegate set operation to docSet', async () => {
+			(docSet as Mock).mockResolvedValue({ response: { msg: 'ok' } });
 			const req = { data: { query: { id: 1 } }, operation: 'set' };
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(docsSet.set).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(docSet).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
 			expect(res).toEqual({ response: { msg: 'ok' } });
 		});
 	});
@@ -185,12 +186,12 @@ describe('DocProcess Unit', () => {
 		it('should delegate add operation when collection is configured and permitted', async () => {
 			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId' });
 			(hasPermission as Mock).mockReturnValue(true);
-			(add.add as Mock).mockResolvedValue({ response: { msg: 'Added' } });
+			(add as Mock).mockResolvedValue({ response: { msg: 'Added' } });
 
 			const req = { data: { query: { id: 1 }, add: { tags: 'tag1' } }, operation: 'add' };
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(add.add).toHaveBeenCalledWith(mockLink, 'test', req);
+			expect(add).toHaveBeenCalledWith(mockLink, 'test', req);
 			expect(res).toEqual({ response: { msg: 'Added' } });
 		});
 

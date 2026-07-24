@@ -1,142 +1,149 @@
 import { AggregationCursor, Collection, Db, FindCursor } from 'mongodb';
 import { docProcess } from './docs-process';
-import { Link } from './db-link';
+import { createLink, Link } from './db-link';
 import {
 	MgCollectionProperties,
 	MgCollections,
 	MgRequest,
 	MgRequestRead,
 	MgResult
-} from './interfaces';
+} from './types';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { read } from './operation-read';
 import { set } from './operation-set';
 import { write } from './operation-write';
-import { operationTransition } from './operation-transition';
+import { transition } from './operation-transition';
+import { AdvancedPermission } from './types';
 
-export class Monguments {
-	get collectionsProperties(): MgCollections {
-		return this.collections;
-	}
-	get db(): Db {
-		return this._db;
-	}
-	private readonly _db: Db;
-	private readonly collections: MgCollections;
-	private readonly link: Link;
+export interface Monguments {
+	readonly db: Db;
+	readonly collectionsProperties: MgCollections;
+	add(collection: string, request: MgRequest): Promise<MgResult>;
+	close(collection: string, request: MgRequest): Promise<MgResult>;
+	getCollection(collection: string): Collection;
+	getCollectionId(collection: string): string;
+	getCollectionProperties(collection: string): MgCollectionProperties | undefined;
+	getCounter(collection: string): Promise<any>;
+	process(collection: string, request: MgRequest, permissions: string): Promise<MgResult>;
+	read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined;
+	set(collection: string, request: MgRequest): Promise<MgResult>;
+	transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission[]): Promise<MgResult>;
+	write(collection: string, request: MgRequest): Promise<MgResult>;
+}
 
-	constructor(db: Db, collections: MgCollections) {
-		this._db = db;
-		this.collections = {};
-		this.link = new Link(db, collections);
-		for (const coll in collections) {
-			if (!collections[coll].owner) {
-				collections[coll].owner = undefined;
+export function normalizeCollections(inputCollections: MgCollections): MgCollections {
+	const result: MgCollections = {};
+	const clonedInput = structuredClone(inputCollections);
+
+	for (const coll in clonedInput) {
+		const config = clonedInput[coll];
+		if (!config.owner) {
+			config.owner = undefined;
+		}
+		if (!config.versionable) {
+			config.versionable = false;
+		}
+		if (!config.versionTime) {
+			config.versionTime = 0;
+		}
+		if (!config.closable) {
+			config.closable = false;
+		}
+		if (!config.closeTime) {
+			config.closeTime = 0;
+		}
+		if (!config.exclusive) {
+			config.exclusive = false;
+		}
+		if (!config.id) {
+			config.id = '_id';
+		}
+		if (!config.idAuto) {
+			config.idAuto = false;
+		}
+		if (!config.add) {
+			config.add = [];
+		}
+		if (!config.set) {
+			config.set = [];
+		}
+		if (!config.required) {
+			config.required = [];
+		}
+		if (config.workflow) {
+			const wf = config.workflow;
+			if (!wf.stateField) {
+				wf.stateField = '_state';
 			}
-			if (!collections[coll].versionable) {
-				collections[coll].versionable = false;
-			}
-			if (!collections[coll].versionTime) {
-				collections[coll].versionTime = 0;
-			}
-			if (!collections[coll].closable) {
-				collections[coll].closable = false;
-			}
-			if (!collections[coll].closeTime) {
-				collections[coll].closeTime = 0;
-			}
-			if (!collections[coll].exclusive) {
-				collections[coll].exclusive = false;
-			}
-			if (!collections[coll].id) {
-				collections[coll].id = '_id';
-			}
-			if (!collections[coll].idAuto) {
-				collections[coll].idAuto = false;
-			}
-			if (!collections[coll].add) {
-				collections[coll].add = [];
-			}
-			if (!collections[coll].set) {
-				collections[coll].set = [];
-			}
-			if (!collections[coll].required) {
-				collections[coll].required = [];
-			}
-			if (collections[coll].workflow) {
-				const wf = collections[coll].workflow;
-				if (!wf.stateField) {
-					wf.stateField = '_state';
-				}
-				if (wf.versionOnTransition === undefined) {
-					wf.versionOnTransition = true;
-				}
-			}
-			if (
-				collections[coll].versionable &&
-				collections[coll].id === '_id' &&
-				(!collections[coll].versionField ||
-					collections[coll].versionField === '_id' ||
-					collections[coll].versionField === ''
-				)
-			) {
-				console.error(`error: in db collection ${coll}, it's not allowed versionable with id "_id"`);
-			} else {
-				this.collections[coll] = structuredClone(collections[coll]);
+			if (wf.versionOnTransition === undefined) {
+				wf.versionOnTransition = true;
 			}
 		}
-	}
-
-	async add(collection: string, request: MgRequest): Promise<MgResult> {
-		return add.add(this.link, collection, request);
-	}
-
-	async close(collection: string, request: MgRequest): Promise<MgResult> {
-		return close(this.link, collection, request);
-	}
-
-	getCollection(collection: string): Collection {
-		return this._db.collection(collection);
-	}
-
-	getCollectionId(collection: string): string {
-		return this.collections[collection].id;
-	}
-
-	getCollectionProperties(collection: string): MgCollectionProperties | undefined {
-		if (this.collections[collection]) {
-			return this.collections[collection];
+		if (
+			config.versionable &&
+			config.id === '_id' &&
+			(!config.versionField ||
+				config.versionField === '_id' ||
+				config.versionField === ''
+			)
+		) {
+			console.error(`error: in db collection ${coll}, it's not allowed versionable with id "_id"`);
+		} else {
+			result[coll] = Object.freeze(structuredClone(config));
 		}
-		return undefined;
 	}
+	return Object.freeze(result);
+}
 
-	async getCounter(collection: string): Promise<any> {
-		const doc = await this._db.collection('counters').findOneAndUpdate(
-			{ _id: collection as any },
-			{ $inc: { seq: 1 } },
-			{ upsert: true, returnDocument: 'after' }
-		);
-		return doc;
-	}
+export function createMonguments(db: Db, collections: MgCollections): Monguments {
+	const normalizedCollections = normalizeCollections(collections);
+	const link = createLink(db, normalizedCollections);
 
-	async process(collection: string, request: MgRequest, permissions: string): Promise<MgResult> {
-		return docProcess(this.link, collection, request, permissions);
-	}
+	return Object.freeze({
+		db,
+		collectionsProperties: normalizedCollections,
+		async add(collection: string, request: MgRequest): Promise<MgResult> {
+			return add(link, collection, request);
+		},
+		async close(collection: string, request: MgRequest): Promise<MgResult> {
+			return close(link, collection, request);
+		},
+		getCollection(collection: string): Collection {
+			return db.collection(collection);
+		},
+		getCollectionId(collection: string): string {
+			return normalizedCollections[collection]?.id;
+		},
+		getCollectionProperties(collection: string): MgCollectionProperties | undefined {
+			return normalizedCollections[collection];
+		},
+		async getCounter(collection: string): Promise<any> {
+			const doc = await db.collection('counters').findOneAndUpdate(
+				{ _id: collection as any },
+				{ $inc: { seq: 1 } },
+				{ upsert: true, returnDocument: 'after' }
+			);
+			return doc;
+		},
+		async process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]): Promise<MgResult> {
+			return docProcess(link, collection, request, permissions, advancedPermissions);
+		},
+		read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined {
+			return read(link, collection, request);
+		},
+		async set(collection: string, request: MgRequest): Promise<MgResult> {
+			return set(link, collection, request);
+		},
+		async transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission[]): Promise<MgResult> {
+			return transition(link, collection, request, advancedPermissions);
+		},
+		async write(collection: string, request: MgRequest): Promise<MgResult> {
+			return write(link, collection, request);
+		}
+	});
+}
 
-	read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined {
-		return read(this.link, collection, request);
-	}
-
-	async set(collection: string, request: MgRequest): Promise<MgResult> {
-		return set.set(this.link, collection, request);
-	}
-
-	async transition(collection: string, request: MgRequest, userRoles: Array<string> = []): Promise<MgResult> {
-		return operationTransition.transition(this.link, collection, request, userRoles);
-	}
-
-	async write(collection: string, request: MgRequest): Promise<MgResult> {
-		return write.write(this.link, collection, request);
-	}
+export function Monguments(db: Db, collections: MgCollections): Monguments {
+	return createMonguments(db, collections);
 }

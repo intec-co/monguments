@@ -1,12 +1,13 @@
 import { validateCollectionName, validateRequest } from './query-validator';
 import { Link } from './db-link';
-import { docsRead } from './docs-read';
-import { docsSet } from './docs-set';
-import { docsWrite } from './docs-write';
+import { readDoc, readList } from './docs-read';
+import { docSet } from './docs-set';
+import { docWrite } from './docs-write';
 import { hasPermission } from './has-permission';
-import { MgCollectionProperties, MgRequest, MgResult } from './interfaces';
+import { AdvancedPermission, MgCollectionProperties, MgRequest, MgResult } from './types';
 import { add } from './operation-add';
 import { close } from './operation-close';
+import { transition } from './operation-transition';
 
 const check = (link: Link, collection: string, request: MgRequest, permissions: string): string | null => {
 	const msg = 'is undefined';
@@ -44,7 +45,7 @@ const check = (link: Link, collection: string, request: MgRequest, permissions: 
 };
 
 export const docProcess = async (
-	link: Link, collection: string, request: any, permissions: any
+	link: Link, collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]
 ): Promise<MgResult> => {
 	const checkErr = check(link, collection, request, permissions);
 	if (checkErr) {
@@ -57,7 +58,7 @@ export const docProcess = async (
 
 	switch (request.operation) {
 		case 'write':
-			return docsWrite.write(link, collection, request, permissions);
+			return docWrite(link, collection, request, permissions);
 		case 'count':
 			permission = permissions.charAt(0);
 			const conf = link.getCollectionProperties(collection);
@@ -79,18 +80,20 @@ export const docProcess = async (
 				return { response: { error: `La colección: ${collection} no esta configurada` } };
 			}
 		case 'read':
-			return docsRead.read(link, collection, request, permissions);
+			return readDoc(link, collection, request, permissions);
 		case 'readList':
-			return docsRead.readList(link, collection, request, permissions);
+			return readList(link, collection, request, permissions);
 		case 'set':
-			return docsSet.set(link, collection, request, permissions);
+			return docSet(link, collection, request, permissions);
+		case 'transition':
+			return transition(link, collection, request, advancedPermissions);
 		case 'add':
 			permission = permissions.charAt(1);
 			collProperties = link.getCollectionProperties(collection);
 			if (collProperties) {
 				owner = collProperties.owner;
 				if (hasPermission(permission, owner, request)) {
-					return add.add(link, collection, request);
+					return add(link, collection, request);
 				} else {
 					return { response: { error: 'No tiene permisos para esta operación' } };
 				}

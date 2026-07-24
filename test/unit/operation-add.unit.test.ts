@@ -25,9 +25,9 @@ describe('OperationAdd Unit', () => {
 	});
 
 	it('should return error when data, add, or query is missing', async () => {
-		const res1 = await add.add(mockMongo, 'test', {} as any);
-		const res2 = await add.add(mockMongo, 'test', { data: { add: { tag: 1 } } } as any);
-		const res3 = await add.add(mockMongo, 'test', { data: { query: { id: 1 } } } as any);
+		const res1 = await add(mockMongo, 'test', {} as any);
+		const res2 = await add(mockMongo, 'test', { data: { add: { tag: 1 } } } as any);
+		const res3 = await add(mockMongo, 'test', { data: { query: { id: 1 } } } as any);
 
 		expect(res1).toEqual({ response: { error: 'data or query is undefined' } });
 		expect(res2).toEqual({ response: { error: 'data or query is undefined' } });
@@ -38,7 +38,7 @@ describe('OperationAdd Unit', () => {
 		vi.spyOn(queryValidatorModule, 'validateDocumentData').mockReturnValue({ valid: false, reason: 'documento con propiedad no permitida' });
 		const req = { data: { add: { tag: 1 }, query: { id: 1 } } };
 
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 		expect(res).toEqual({ response: { error: 'documento con propiedad no permitida' } });
 	});
 
@@ -46,7 +46,7 @@ describe('OperationAdd Unit', () => {
 		mockMongo.getCollectionProperties.mockReturnValue(undefined);
 		const req = { data: { add: { tag: 1 }, query: { id: 1 } } };
 
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 		expect(res).toEqual({ response: { error: 'Colección no configurada' } });
 	});
 
@@ -59,7 +59,7 @@ describe('OperationAdd Unit', () => {
 		mockCollection.updateOne.mockResolvedValue({});
 
 		const req = { data: { add: { tags: 'tag1', meta: { key: 'v' } }, query: { id: 1 } }, user: 1, ips: ['127.0.0.1'] };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(mockCollection.updateOne).toHaveBeenCalled();
 		expect(res).toEqual({ response: { msg: 'información guardada' } });
@@ -74,7 +74,7 @@ describe('OperationAdd Unit', () => {
 		mockCollection.updateOne.mockRejectedValue(new Error('db error'));
 
 		const req = { data: { add: { tags: 'tag1' }, query: { id: 1 } } };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'ha ocurrido un error', msg: 'error mongo.add document' } });
 	});
@@ -87,7 +87,7 @@ describe('OperationAdd Unit', () => {
 		});
 
 		const req = { data: { add: { tags: 'tag1' }, query: { id: 1 } } };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'no se puede procesar la solicitud' } });
 	});
@@ -100,7 +100,7 @@ describe('OperationAdd Unit', () => {
 		mockCollection.find.mockReturnValue({ next: vi.fn().mockResolvedValue(null) });
 
 		const req = { data: { add: { list: 1 }, query: { id: 1 } } };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'error en mongo.set, no se encontro el documento' } });
 	});
@@ -113,7 +113,7 @@ describe('OperationAdd Unit', () => {
 		mockCollection.find.mockReturnValue({ next: vi.fn().mockRejectedValue(new Error('find error')) });
 
 		const req = { data: { add: { list: 1 }, query: { id: 1 } } };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { error: 'error en mongo.set' } });
 	});
@@ -131,7 +131,7 @@ describe('OperationAdd Unit', () => {
 		mockCollection.updateOne.mockResolvedValue({});
 
 		const req = { data: { add: { list: 1 }, query: { id: 1 } } };
-		const res = await add.add(mockMongo, 'test', req as any);
+		const res = await add(mockMongo, 'test', req as any);
 
 		expect(res).toEqual({ response: { msg: 'información guardada' } });
 	});

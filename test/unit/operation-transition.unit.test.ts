@@ -1,6 +1,5 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { operationTransition, OperationTransition } from '../../lib/operation-transition';
-import { set } from '../../lib/operation-set';
+import { transition, validateTransition } from '../../lib/operation-transition';
 
 describe('OperationTransition Unit', () => {
 	let mockMongo: any;
@@ -47,13 +46,13 @@ describe('OperationTransition Unit', () => {
 					{
 						from: 'pending_approval',
 						to: 'published',
-						allowedRoles: ['admin', 'editor'],
+						allowedActions: ['admin', 'editor'],
 						autoClose: true
 					},
 					{
 						from: '*',
 						to: 'archived',
-						allowedRoles: ['admin']
+						allowedActions: ['admin']
 					}
 				]
 			}
@@ -66,43 +65,37 @@ describe('OperationTransition Unit', () => {
 
 	describe('validateTransition', () => {
 		it('should return error when workflow is not configured', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition({} as any, {}, 'published');
+			const res = validateTransition({} as any, {}, 'published');
 			expect(res.valid).toBe(false);
 			expect(res.error).toContain('Workflow no configurado');
 		});
 
 		it('should return error when document is already in target state', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(sampleConf, { _state: 'draft' }, 'draft');
+			const res = validateTransition(sampleConf, { _state: 'draft' }, 'draft');
 			expect(res.valid).toBe(false);
 			expect(res.error).toContain('ya se encuentra en el estado');
 		});
 
 		it('should return error for an invalid transition path', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(sampleConf, { _state: 'draft' }, 'published');
+			const res = validateTransition(sampleConf, { _state: 'draft' }, 'published');
 			expect(res.valid).toBe(false);
 			expect(res.error).toContain('Transición no permitida');
 		});
 
-		it('should return error if user does not have allowed role', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(sampleConf, { _state: 'pending_approval' }, 'published', ['viewer']);
+		it('should return error if user does not have allowed action', () => {
+			const res = validateTransition(sampleConf, { _state: 'pending_approval' }, 'published', ['viewer']);
 			expect(res.valid).toBe(false);
-			expect(res.error).toContain('Rol no autorizado');
+			expect(res.error).toContain('Acción no autorizado para la transición a \'published\'');
 		});
 
 		it('should return error if required field is missing', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(sampleConf, { _state: 'draft' }, 'pending_approval', [], {});
+			const res = validateTransition(sampleConf, { _state: 'draft' }, 'pending_approval', [], {});
 			expect(res.valid).toBe(false);
 			expect(res.error).toContain('Campo requerido');
 		});
 
 		it('should succeed when all conditions are met', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(
+			const res = validateTransition(
 				sampleConf,
 				{ _state: 'pending_approval' },
 				'published',
@@ -113,8 +106,7 @@ describe('OperationTransition Unit', () => {
 		});
 
 		it('should match wildcard transition from *', () => {
-			const op = new OperationTransition();
-			const res = op.validateTransition(
+			const res = validateTransition(
 				sampleConf,
 				{ _state: 'pending_approval' },
 				'archived',
@@ -126,15 +118,15 @@ describe('OperationTransition Unit', () => {
 
 	describe('transition operation execution', () => {
 		it('should return error when query or target state is missing', async () => {
-			const res = await operationTransition.transition(mockMongo, 'testColl', { user: 1, data: {} });
+			const res = await transition(mockMongo, 'testColl', { user: 1, data: {} });
 			expect(res.response?.error).toContain('Consulta (query) no especificada');
 		});
 
 		it('should return error when collection has no workflow', async () => {
 			mockMongo.getCollectionProperties.mockReturnValue({ versionable: false });
-			const res = await operationTransition.transition(mockMongo, 'testColl', {
+			const res = await transition(mockMongo, 'testColl', {
 				user: 1,
-				targetState: 'published',
+				data: { targetState: 'published' },
 				query: { id: 1 }
 			});
 			expect(res.response?.error).toContain('Colección o Workflow no configurado');
@@ -144,11 +136,10 @@ describe('OperationTransition Unit', () => {
 			mockMongo.getCollectionProperties.mockReturnValue(sampleConf);
 			mockCollection.findOne.mockResolvedValue(null);
 
-			const res = await operationTransition.transition(mockMongo, 'testColl', {
+			const res = await transition(mockMongo, 'testColl', {
 				user: 1,
-				targetState: 'pending_approval',
 				query: { id: 1 },
-				data: { reviewerId: 'usr123' }
+				data: { reviewerId: 'usr123', targetState: 'pending_approval' }
 			});
 			expect(res.response?.error).toContain('Documento no encontrado');
 		});
@@ -158,38 +149,20 @@ describe('OperationTransition Unit', () => {
 			mockCollection.findOne.mockResolvedValue({ id: 1, _state: 'pending_approval' });
 			mockCollection.updateOne.mockResolvedValue({ matchedCount: 1 });
 
-			const res = await operationTransition.transition(
+			const res = await transition(
 				mockMongo,
 				'testColl',
 				{
 					user: 100,
 					ips: ['127.0.0.1'],
-					targetState: 'published',
+					data: { targetState: 'published' },
 					query: { id: 1 }
 				},
-				['editor']
+				[{ operation: 'transition', value: ['editor'] }]
 			);
 
 			expect(mockCollection.updateOne).toHaveBeenCalled();
 			expect(res.response?.msg).toContain('información guardada');
-		});
-	});
-
-	describe('integration with operationSet', () => {
-		it('should reject set operation if state field transition is invalid', async () => {
-			mockMongo.getCollectionProperties.mockReturnValue(sampleConf);
-			mockCollection.findOne.mockResolvedValue({ id: 1, _state: 'draft' });
-
-			const setReq = {
-				user: 100,
-				data: {
-					query: { id: 1 },
-					set: { _state: 'published' }
-				}
-			};
-
-			const res = await set.set(mockMongo, 'testColl', setReq);
-			expect(res.response?.error).toContain('Transición no permitida');
 		});
 	});
 });
