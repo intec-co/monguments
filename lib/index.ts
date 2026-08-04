@@ -8,7 +8,7 @@ export async function mgConnectDb(conf: MgConf, client: MgClient): Promise<Mongu
 	try {
 		await mongodbClient.connect();
 		const db = mongodbClient.db(client.db);
-		return createMonguments(db, collections);
+		return createMonguments(db, collections, mongodbClient);
 	} catch (err) {
 		console.error(err);
 		throw new Error('Could not connect to mongodb');

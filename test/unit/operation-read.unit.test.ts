@@ -168,4 +168,36 @@ describe('OperationRead Unit', () => {
 			{ $project: { a: 1, others1: 1 } }
 		]);
 	});
+
+	it('should throw error when regex is used in read operation', () => {
+		mockMongo.getCollectionProperties.mockReturnValue({
+			regex: ['name'],
+			properties: {}
+		});
+
+		expect(() => read(mockMongo, 'testColl', { data: { name: { $regex: 'abc' } } }, 'read'))
+			.toThrow('No se permite el uso de expresiones regulares en la operación read');
+	});
+
+	it('should transform regex in readList operation when field is allowed', () => {
+		mockMongo.getCollectionProperties.mockReturnValue({
+			regex: ['name'],
+			properties: {}
+		});
+
+		const reqData = { name: { $regex: 'abc' } };
+		read(mockMongo, 'testColl', { data: reqData }, 'readList');
+
+		expect(mockCollection.find).toHaveBeenCalledWith({ name: { $regex: '^abc' } });
+	});
+
+	it('should throw error in readList operation when field is not allowed for regex', () => {
+		mockMongo.getCollectionProperties.mockReturnValue({
+			regex: ['title'],
+			properties: {}
+		});
+
+		expect(() => read(mockMongo, 'testColl', { data: { name: { $regex: 'abc' } } }, 'readList'))
+			.toThrow("El campo 'name' no está habilitado para búsqueda por regex");
+	});
 });

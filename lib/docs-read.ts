@@ -147,7 +147,8 @@ export async function readDoc(mongo: Link, collection: string, req: MgRequest, p
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {
-		const cursor = read(mongo, collection, req);
+		req.operation = 'read';
+		const cursor = read(mongo, collection, req, 'read');
 		const doc = await cursor.next();
 		if (!doc) {
 			return { response: { msg: 'No se encontraron documentos' } };
@@ -165,7 +166,8 @@ export async function readList(mongo: Link, collection: string, req: MgRequest, 
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {
-		const cursor = read(mongo, collection, req);
+		req.operation = 'readList';
+		const cursor = read(mongo, collection, req, 'readList');
 		const array = await cursor.toArray();
 		if (!(array && array.length)) {
 			return { response: { msg: 'No se encontraron documentos' } };

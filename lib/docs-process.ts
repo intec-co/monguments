@@ -36,7 +36,8 @@ const check = (link: Link, collection: string, request: MgRequest, permissions: 
 		return `Operation ${msg}`;
 	}
 
-	const validation = validateRequest(request);
+	const conf = link.getCollectionProperties(collection);
+	const validation = validateRequest(request, conf);
 	if (!validation.valid) {
 		return validation.reason || 'Consulta o datos no válidos';
 	}

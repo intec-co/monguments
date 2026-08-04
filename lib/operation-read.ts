@@ -1,5 +1,5 @@
 import { AggregationCursor, FindCursor } from 'mongodb';
-import { validateQueryFilter, validateReadParams } from './query-validator';
+import { processAndValidateRegex, validateQueryFilter, validateReadParams } from './query-validator';
 import { Link } from './db-link';
 import { MGParamsRead, MgRequestRead } from './types';
 
@@ -54,7 +54,7 @@ function readDirect(mongo: Link, collection: string, query: any, params: MGParam
 	return cursor;
 }
 
-export function read(mongo: Link, collection: string, request: MgRequestRead): FindCursor | AggregationCursor {
+export function read(mongo: Link, collection: string, request: MgRequestRead, op?: string): FindCursor | AggregationCursor {
 	const validQuery = validateQueryFilter(request.data);
 	if (!validQuery.valid) {
 		throw new Error(validQuery.reason || 'Consulta no válida');
@@ -66,10 +66,15 @@ export function read(mongo: Link, collection: string, request: MgRequestRead): F
 		}
 	}
 
+	const conf = mongo.getCollectionProperties(collection);
+	const operation = op || (request as any).operation || 'readList';
+	const validRegex = processAndValidateRegex(request.data, conf, operation);
+	if (!validRegex.valid) {
+		throw new Error(validRegex.reason || 'Expresión regular no válida');
+	}
+	const maxLimit = conf?.maxLimit || 1000;
 	const query = request.data;
 	let params = request.params;
-	const conf = mongo.getCollectionProperties(collection);
-	const maxLimit = conf?.maxLimit || 1000;
 
 	if (conf) {
 		const p = conf.properties;

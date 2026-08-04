@@ -1,3 +1,5 @@
+import { MgCollectionProperties } from './types';
+
 export const ALLOWED_QUERY_OPERATORS = new Set([
 	'$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin',
 	'$and', '$or', '$nor', '$not', '$exists', '$type', '$elemMatch',
@@ -15,6 +17,8 @@ export const PROTOTYPE_POLLUTION_KEYS = new Set([
 export const FORBIDDEN_COLLECTION_PREFIXES = ['system.', 'admin.', 'config.', 'local.'];
 
 export const DANGEROUS_REDOS_PATTERN = /(\(.+[\+\*]\)[\+\*])/;
+
+export const LEADING_WILDCARD_PATTERN = /^(?:\^)?\.[*+]/;
 
 export const MAX_DEPTH = 10;
 
@@ -63,7 +67,162 @@ export const validateRegexPattern = (pattern: any): ValidationResult => {
 				reason: 'Regex pattern potentially vulnerable to ReDoS (nested quantifiers)'
 			};
 		}
+		if (LEADING_WILDCARD_PATTERN.test(strPattern)) {
+			return {
+				valid: false,
+				reason: "No se permiten expresiones regulares con comodines iniciales como '.*' o '.+' que anulen el índice"
+			};
+		}
 	}
+	return { valid: true };
+};
+
+export const isFieldAllowedForRegex = (field: string, allowedRegex?: Array<string> | '*'): boolean => {
+	if (!allowedRegex) {
+		return false;
+	}
+	if (allowedRegex === '*') {
+		return true;
+	}
+	if (Array.isArray(allowedRegex)) {
+		return allowedRegex.includes(field);
+	}
+	return false;
+};
+
+export const processAndValidateRegex = (
+	query: any,
+	conf?: MgCollectionProperties,
+	operation: string = 'readList',
+	currentField: string = ''
+): ValidationResult => {
+	if (query === null || query === undefined || typeof query !== 'object') {
+		return { valid: true };
+	}
+
+	if (query instanceof Date) {
+		return { valid: true };
+	}
+
+	if (query instanceof RegExp) {
+		if (operation === 'read') {
+			return {
+				valid: false,
+				reason: 'No se permite el uso de expresiones regulares en la operación read'
+			};
+		}
+		if (!isFieldAllowedForRegex(currentField, conf?.regex)) {
+			return {
+				valid: false,
+				reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
+			};
+		}
+		const validPat = validateRegexPattern(query);
+		if (!validPat.valid) {
+			return validPat;
+		}
+		return { valid: true };
+	}
+
+	if (Array.isArray(query)) {
+		for (let i = 0; i < query.length; i++) {
+			const item = query[i];
+			if (item instanceof RegExp) {
+				if (operation === 'read') {
+					return {
+						valid: false,
+						reason: 'No se permite el uso de expresiones regulares en la operación read'
+					};
+				}
+				if (!isFieldAllowedForRegex(currentField, conf?.regex)) {
+					return {
+						valid: false,
+						reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
+					};
+				}
+				const validPat = validateRegexPattern(item);
+				if (!validPat.valid) {
+					return validPat;
+				}
+				if (!item.source.startsWith('^')) {
+					query[i] = new RegExp('^' + item.source, item.flags);
+				}
+			} else if (typeof item === 'object' && item !== null) {
+				const res = processAndValidateRegex(item, conf, operation, currentField);
+				if (!res.valid) {
+					return res;
+				}
+			}
+		}
+		return { valid: true };
+	}
+
+	const keys = Object.keys(query);
+	for (const key of keys) {
+		const val = query[key];
+
+		if (key === '$regex') {
+			if (operation === 'read') {
+				return {
+					valid: false,
+					reason: 'No se permite el uso de expresiones regulares en la operación read'
+				};
+			}
+			if (!isFieldAllowedForRegex(currentField, conf?.regex)) {
+				return {
+					valid: false,
+					reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
+				};
+			}
+			const validPat = validateRegexPattern(val);
+			if (!validPat.valid) {
+				return validPat;
+			}
+			if (typeof val === 'string') {
+				if (!val.startsWith('^')) {
+					query[key] = '^' + val;
+				}
+			} else if (val instanceof RegExp) {
+				if (!val.source.startsWith('^')) {
+					query[key] = new RegExp('^' + val.source, val.flags);
+				}
+			}
+			continue;
+		}
+
+		if (val instanceof RegExp) {
+			if (operation === 'read') {
+				return {
+					valid: false,
+					reason: 'No se permite el uso de expresiones regulares en la operación read'
+				};
+			}
+			const targetField = key.startsWith('$') ? currentField : key;
+			if (!isFieldAllowedForRegex(targetField, conf?.regex)) {
+				return {
+					valid: false,
+					reason: `El campo '${targetField}' no está habilitado para búsqueda por regex`
+				};
+			}
+			const validPat = validateRegexPattern(val);
+			if (!validPat.valid) {
+				return validPat;
+			}
+			if (!val.source.startsWith('^')) {
+				query[key] = new RegExp('^' + val.source, val.flags);
+			}
+			continue;
+		}
+
+		if (typeof val === 'object' && val !== null) {
+			const nextField = key.startsWith('$') ? currentField : key;
+			const res = processAndValidateRegex(val, conf, operation, nextField);
+			if (!res.valid) {
+				return res;
+			}
+		}
+	}
+
 	return { valid: true };
 };
 
@@ -283,7 +442,7 @@ export const validateReadParams = (params: any, depth: number = 0): ValidationRe
 /**
  * Validates a complete MgRequest payload according to the operation type.
  */
-export const validateRequest = (request: any): ValidationResult => {
+export const validateRequest = (request: any, conf?: MgCollectionProperties): ValidationResult => {
 	if (!request || typeof request !== 'object') {
 		return { valid: true };
 	}
@@ -298,10 +457,14 @@ export const validateRequest = (request: any): ValidationResult => {
 		if (request.data) {
 			const res = validateQueryFilter(request.data);
 			if (!res.valid) { return res; }
+			const regRes = processAndValidateRegex(request.data, conf, op);
+			if (!regRes.valid) { return regRes; }
 		}
 		if (request.query) {
 			const res = validateQueryFilter(request.query);
 			if (!res.valid) { return res; }
+			const regRes = processAndValidateRegex(request.query, conf, op);
+			if (!regRes.valid) { return regRes; }
 		}
 	} else if (op === 'write' || op === 'add') {
 		if (request.data) {

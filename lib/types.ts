@@ -42,6 +42,7 @@ export type MgCollectionProperties = {
 	projections?: any[];
 	maxLimit?: number;
 	workflow?: MgWorkflowConfig;
+	regex?: Array<string> | '*';
 }
 
 export type MgCollections = { [key: string]: MgCollectionProperties; }

@@ -1,4 +1,4 @@
-import { AggregationCursor, Collection, Db, FindCursor } from 'mongodb';
+import { AggregationCursor, Collection, Db, FindCursor, MongoClient } from 'mongodb';
 import { docProcess } from './docs-process';
 import { createLink, Link } from './db-link';
 import {
@@ -17,6 +17,7 @@ import { transition } from './operation-transition';
 import { AdvancedPermission } from './types';
 
 export interface Monguments {
+	readonly client: MongoClient;
 	readonly db: Db;
 	readonly collectionsProperties: MgCollections;
 	add(collection: string, request: MgRequest): Promise<MgResult>;
@@ -32,7 +33,7 @@ export interface Monguments {
 	write(collection: string, request: MgRequest): Promise<MgResult>;
 }
 
-export function normalizeCollections(inputCollections: MgCollections): MgCollections {
+function normalizeCollections(inputCollections: MgCollections): MgCollections {
 	const result: MgCollections = {};
 	const clonedInput = structuredClone(inputCollections);
 
@@ -96,11 +97,12 @@ export function normalizeCollections(inputCollections: MgCollections): MgCollect
 	return Object.freeze(result);
 }
 
-export function createMonguments(db: Db, collections: MgCollections): Monguments {
+export function createMonguments(db: Db, collections: MgCollections, client?: MongoClient): Monguments {
 	const normalizedCollections = normalizeCollections(collections);
 	const link = createLink(db, normalizedCollections);
 
 	return Object.freeze({
+		client,
 		db,
 		collectionsProperties: normalizedCollections,
 		async add(collection: string, request: MgRequest): Promise<MgResult> {
@@ -144,6 +146,6 @@ export function createMonguments(db: Db, collections: MgCollections): Monguments
 	});
 }
 
-export function Monguments(db: Db, collections: MgCollections): Monguments {
-	return createMonguments(db, collections);
+export function Monguments(db: Db, collections: MgCollections, client: MongoClient): Monguments {
+	return createMonguments(db, collections, client);
 }
