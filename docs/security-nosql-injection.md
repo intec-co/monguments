@@ -31,6 +31,12 @@ The **Monguments** library implements a comprehensive defense-in-depth architect
   - Restricts `$regex` pattern length to a maximum of 150 characters.
   - Blocks patterns with dangerous nested quantifiers (e.g., `(a+)+`, `(a*)*`).
 
+### 1.5 Runtime Schema & Payload Sanitization (Zod)
+- **Risk Mitigated**: Malformed payload attacks, invalid collection schema configurations, and permission structure tampering.
+- **Implementation**:
+  - `mgCollectionsSchema` ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)) enforces strict type and property structure rules during library initialization.
+  - `mgRequestSchema` and `advancedPermissionSchema` sanitize incoming operation requests and permissions prior to query processing.
+
 ---
 
 ## 2. Test Coverage Matrix
@@ -40,6 +46,7 @@ The automated unit test suite validates security safeguards across multiple test
 - [`test/unit/query-validator.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/query-validator.unit.test.ts): NoSQL operator injection, null/undefined rejection, prototype pollution keys.
 - [`test/unit/query-validator-edgecases.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/query-validator-edgecases.unit.test.ts): Prototype pollution evasion, case variations, `Object.create(null)` handling.
 - [`test/unit/security-hardening.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/security-hardening.unit.test.ts): Depth limits, per-collection `maxLimit`, system collections, and ReDoS regex patterns.
+- [`test/unit/zod-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/zod-validation.unit.test.ts): Runtime Zod schema validation for collection configurations, request parameters, and permission strings.
 
 ---
 

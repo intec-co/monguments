@@ -141,3 +141,14 @@ monguments.close('articles', closeRequest, (data, response) => {
   console.log('Document closed');
 });
 ```
+
+---
+
+## 4. Validation & Error Responses (Zod Schemas)
+
+Every request routed via `process()` is pre-validated at runtime against Zod schemas ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)):
+- **Request Payload (`mgRequestSchema`)**: Ensures `user`, `operation`, `data`, and `params` conform to expected types.
+- **Permissions (`advancedPermissionSchema`)**: Validates 2-character strings (e.g. `'rw'`, `'RW'`) or structured permission objects.
+
+If validation fails, `process()` returns an `MgResult` with `data: null` and `response.error` containing the Zod validation failure details (e.g., `'Invalid request parameter: ...'`).
+

@@ -9,7 +9,7 @@ The **Monguments Architect** subagent is specialized in designing data schemas, 
 1. **Schema & Collection Architecture**:
    - Design optimal `MgCollectionProperties` configurations based on business domain requirements.
    - Select appropriate versioning strategies (`versionable`, `versionTime`), state closure rules (`closable`), and ownership fields (`owner`).
-   - Define property restrictions (`set`, `add`, `required`, `setClosed`, `addClosed`).
+   - Define property restrictions (`set`, `add`, `required`, `setClosed`, `addClosed`) validated against `mgCollectionsSchema` in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts).
 
 2. **Access Control & Permissions Modeling**:
    - Design permission matrices (`rw`, `RW`, `rc`, `RC`, etc.) mapped to user roles and document ownership.

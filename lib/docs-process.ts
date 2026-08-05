@@ -5,11 +5,18 @@ import { docSet } from './docs-set';
 import { docWrite } from './docs-write';
 import { hasPermission } from './has-permission';
 import { AdvancedPermission, MgCollectionProperties, MgRequest, MgResult } from './types';
+import { mgRequestSchema, advancedPermissionsSchema } from './schemas';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { transition } from './operation-transition';
 
-const check = (link: Link, collection: string, request: MgRequest, permissions: string): string | null => {
+const check = (
+	link: Link,
+	collection: string,
+	request: MgRequest,
+	permissions: string,
+	advancedPermissions?: AdvancedPermission[]
+): string | null => {
 	const msg = 'is undefined';
 	if (!request) {
 		return 'Request undefined';
@@ -23,17 +30,28 @@ const check = (link: Link, collection: string, request: MgRequest, permissions: 
 	if (!collection) {
 		return `Collection ${msg}`;
 	}
-
-	const collVal = validateCollectionName(collection);
-	if (!collVal.valid) {
-		return collVal.reason || 'Nombre de colección no válido';
-	}
-
 	if (!request.data) {
 		return `Data ${msg}`;
 	}
 	if (!request.operation) {
 		return `Operation ${msg}`;
+	}
+
+	const reqParsed = mgRequestSchema.safeParse(request);
+	if (!reqParsed.success) {
+		return `Invalid request: ${reqParsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+	}
+
+	if (advancedPermissions !== undefined) {
+		const advParsed = advancedPermissionsSchema.safeParse(advancedPermissions);
+		if (!advParsed.success) {
+			return `Invalid advancedPermissions: ${advParsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+		}
+	}
+
+	const collVal = validateCollectionName(collection);
+	if (!collVal.valid) {
+		return collVal.reason || 'Nombre de colección no válido';
 	}
 
 	const conf = link.getCollectionProperties(collection);
@@ -48,7 +66,7 @@ const check = (link: Link, collection: string, request: MgRequest, permissions: 
 export const docProcess = async (
 	link: Link, collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]
 ): Promise<MgResult> => {
-	const checkErr = check(link, collection, request, permissions);
+	const checkErr = check(link, collection, request, permissions, advancedPermissions);
 	if (checkErr) {
 		return { response: { error: checkErr } };
 	}

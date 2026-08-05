@@ -31,6 +31,7 @@ A high-level TypeScript document management library for MongoDB providing built-
   - [MongoDB `$lookup` Stages](#mongodb-lookup-stages)
   - [Collection Links](#collection-links)
 - [Security & Hardening](#security--hardening)
+- [Runtime Validation & Schemas (Zod)](#runtime-validation--schemas-zod)
 - [TypeScript Interfaces](#typescript-interfaces)
 - [AI & LLM Integration](#ai--llm-integration)
 - [Publishing](#publishing)
@@ -47,13 +48,14 @@ A high-level TypeScript document management library for MongoDB providing built-
 - 🔒 **Document Closure**: Lock documents (`_closed: true`) to prevent unauthorized modifications while optionally allowing specific field updates (`addClosed`, `setClosed`).
 - 🔢 **Auto-Increment Numeric IDs**: Built-in sequence counter support using an internal `counters` collection (`idAuto: true`).
 - 🔗 **Aggregations & Lookups**: Simplified `$lookup` aggregation pipelines and relational collection linking.
+- 🛡️ **Runtime Schema Validation**: Built-in Zod schema validation for collection configurations (`MgCollections`), request payloads (`MgRequest`), and permission parameters (`AdvancedPermission`).
 
 ---
 
 ## Installation
 
 ```bash
-npm install monguments mongodb class-validator
+npm install monguments mongodb zod
 ```
 
 ---
@@ -494,6 +496,24 @@ Every write, update, or state change automatically stamps the document with a no
 }
 ```
 For detailed security reports and benchmarks, see the [Security & NoSQL Injection Report](file:///Users/cavargasp/projects/monguments/docs/security-nosql-injection.md).
+
+---
+
+## Runtime Validation & Schemas (Zod)
+
+Monguments uses **Zod** to validate schema configurations and operation request parameters at runtime, ensuring robust type safety and early failure before querying MongoDB.
+
+### 1. Collection Configuration Validation (`mgCollectionsSchema`)
+When instantiating `Monguments` or `mgConnectDb()`, the `collections` map is validated against `mgCollectionsSchema`:
+- Validates identifier settings (`id`, `idAuto`).
+- Ensures required metadata field mappings exist (`properties.isLast`, `properties.w`, `properties.closed`, `properties.date`, `properties.history`).
+- Throws a descriptive `Error` (`Invalid collection properties configuration: ...`) if properties are missing or misconfigured.
+
+### 2. Request & Permission Validation (`mgRequestSchema`, `advancedPermissionSchema`)
+Every operation routed through `process()` is validated:
+- `mgRequestSchema`: Verifies `user` (number/string), optional `ips`, valid `operation` string, and payload parameters.
+- `advancedPermissionSchema`: Validates 2-character permission strings (e.g., `'rw'`, `'RW'`, `'Rc'`) or structured role-based permission definitions.
+- Returns structured error responses (`{ data: null, response: { error: 'Invalid request parameter: ...' } }`) on validation failure.
 
 ---
 

@@ -15,6 +15,7 @@ import { set } from './operation-set';
 import { write } from './operation-write';
 import { transition } from './operation-transition';
 import { AdvancedPermission } from './types';
+import { mgCollectionsSchema } from './schemas';
 
 export interface Monguments {
 	readonly client: MongoClient;
@@ -34,6 +35,7 @@ export interface Monguments {
 }
 
 function normalizeCollections(inputCollections: MgCollections): MgCollections {
+	mgCollectionsSchema.parse(inputCollections);
 	const result: MgCollections = {};
 	const clonedInput = structuredClone(inputCollections);
 

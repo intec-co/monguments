@@ -9,7 +9,7 @@ This guide provides step-by-step instructions for publishing new releases of the
 Monguments uses a streamlined, single-folder build architecture:
 - Source TypeScript files live in `lib/`.
 - `tsc` compiles TypeScript code directly into `dist/`.
-- `package.json` specifies `"files": ["dist"]`, ensuring only compiled JavaScript, declaration files (`.d.ts`), `README.md`, `LICENSE`, and `package.json` are packaged into the published `.tgz` tarball.
+- `package.json` specifies `"files": ["dist", "LLMS.md"]`, ensuring compiled JavaScript, declaration files (`.d.ts`), `LLMS.md`, `README.md`, `LICENSE`, and `package.json` are packaged into the published `.tgz` tarball.
 - `package.json` defines `"prepublishOnly": "npm run test && npm run build"`, which automatically runs unit tests and compiles code before publishing.
 
 ---
@@ -45,7 +45,7 @@ npm run build
 npm pack --dry-run
 ```
 
-Ensure `npm pack --dry-run` displays only `dist/` files, `README.md`, `LICENSE`, and `package.json`.
+Ensure `npm pack --dry-run` displays `dist/` files, `LLMS.md`, `README.md`, `LICENSE`, and `package.json`.
 
 ---
 
@@ -86,7 +86,7 @@ npm publish
 > 1. NPM automatically executes `"prepublishOnly": "npm run test && npm run build"`.
 > 2. `vitest` runs all unit tests.
 > 3. `tsc` compiles TypeScript into `dist/`.
-> 4. NPM creates the tarball containing only files specified in `"files": ["dist"]` + `README.md` + `LICENSE`.
+> 4. NPM creates the tarball containing only files specified in `"files": ["dist", "LLMS.md"]` + `README.md` + `LICENSE`.
 > 5. The package is uploaded to `https://registry.npmjs.org/monguments`.
 
 ---

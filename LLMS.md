@@ -20,7 +20,10 @@ import {
   MgResponse,
   MgLink,
   MongoLookup,
-  MongoLookupPipeLine
+  MongoLookupPipeLine,
+  mgCollectionsSchema,
+  mgRequestSchema,
+  advancedPermissionSchema
 } from 'monguments';
 ```
 
@@ -344,3 +347,22 @@ export interface MgResponse {
 ```
 
 Check `result.response?.error` or handle thrown `Error` instances in try/catch blocks when performing operations.
+
+---
+
+## 8. Zod Runtime Validation & Error Specs
+
+`monguments` uses **Zod** (`zod`) for strict runtime contract checking:
+
+### Initialization Validation (`mgCollectionsSchema`)
+- **When**: Constructor `new Monguments(db, collections)` or `mgConnectDb(...)`.
+- **Behavior**: Throws a synchronous `Error` on invalid `collections` configuration.
+- **Error Format**: `Error("Invalid collection properties configuration: <zod-error-details>")`.
+
+### Dispatcher Request & Permission Validation (`mgRequestSchema`, `advancedPermissionSchema`)
+- **When**: Call to `monguments.process(collection, request, permission)`.
+- **Behavior**: Validates `request` and `permission` parameters before executing database queries.
+- **Result Output**: Returns `MgResult` with `data: null` and `response.error`:
+  - Request error: `response: { error: 'Invalid request parameter: <zod-error-details>' }`
+  - Permission error: `response: { error: 'Invalid permission parameter: <zod-error-details>' }`
+

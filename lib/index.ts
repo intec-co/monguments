@@ -18,3 +18,4 @@ export async function mgConnectDb(conf: MgConf, client: MgClient): Promise<Mongu
 export * from './types';
 export * from './monguments';
 export * from './operation-transition';
+export * from './schemas';

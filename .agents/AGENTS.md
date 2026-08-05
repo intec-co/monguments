@@ -6,18 +6,17 @@ Welcome to the **Monguments** library repository. This codebase provides high-le
 
 ## 1. Project Stack & Architecture
 
-- **Language & Runtime**: TypeScript targeted for Node.js (Engine: `>=24.0.0`).
-- **Dependencies**: `mongodb` driver (v4+), `class-validator`.
-- **Test Framework**: `jest` with `mongodb-memory-server` for isolated DB unit tests.
-- **Linter**: `tslint` (strictly enforced code formatting and type safety).
+- **Language & Runtime**: TypeScript targeted for Node.js (Engine: `>=26.0.0`).
+- **Dependencies**: `mongodb` driver (v7+), `zod`.
+- **Test Framework**: `vitest` with `mongodb-memory-server` for isolated DB unit tests.
 - **Core Architecture Document**: Refer to [`docs/architecture.md`](file:///Users/cavargasp/projects/monguments/docs/architecture.md) for full architectural details.
 
 ---
 
 ## 2. Guidelines for AI Assistants & LLMs
 
-1. **Strict Type Safety**:
-   - Always preserve and update interfaces in [`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts) when extending functionality.
+1. **Strict Type Safety & Runtime Validation**:
+   - Always preserve and update interfaces in [`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts) and Zod schemas in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts) when extending functionality or modifying request structures.
    - Avoid using `any` unless dealing with arbitrary MongoDB queries or legacy helper dynamics.
 
 2. **Permission Checks First**:

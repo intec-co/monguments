@@ -46,6 +46,12 @@ When collection properties have `workflow` defined:
 - Supports automatic document closure (`autoClose: true`) upon reaching terminal states.
 - Integrates with version control: creates version snapshots on transition when `versionOnTransition` and `versionable` are enabled.
 
+### 1.6 Runtime Schema & Request Validation (`Zod`)
+Located in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts):
+- Enforces strict runtime validation for collection configurations (`mgCollectionsSchema`) upon `Monguments` instantiation.
+- Validates request payloads (`mgRequestSchema`) and permission strings/objects (`advancedPermissionSchema`) in `docProcess` before any database queries execute.
+- Fails fast with structured error messages to prevent invalid operations or corrupted database states.
+
 ---
 
 ## 2. Main API Components
@@ -113,6 +119,7 @@ monguments/
 │   ├── operation-set.ts     # Set operation implementation
 │   ├── operation-transition.ts # State machine workflow transition handler
 │   ├── operation-write.ts   # Write operation implementation
+│   ├── schemas.ts           # Zod runtime validation schemas
 │   └── tools.ts             # Utility functions
 ├── test/                    # Vitest unit test files
 ├── docs/

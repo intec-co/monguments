@@ -83,3 +83,5 @@ const mg = await mgConnectDb({ uri: 'mongodb://localhost:27017', db: 'shop' }, {
        history: '_*_h'
      }
      ```
+4. **Zod Runtime Schema Validation**:
+   - Collections configuration passed to `Monguments` or `mgConnectDb()` is automatically validated against `mgCollectionsSchema` ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)). Invalid schema properties will throw an `Error` upon library initialization.
