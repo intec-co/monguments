@@ -41,7 +41,7 @@ When collection properties have `closable: true`:
 ### 1.5 Document Workflows & State Machines
 When collection properties have `workflow` defined:
 - Enforces valid state transitions (`from` -> `to`).
-- Restricts state transitions by user roles (`allowedRoles`).
+- Restricts state transitions by authorized actions (`allowedActions`).
 - Enforces required payload/document fields (`requiredFields`).
 - Supports automatic document closure (`autoClose: true`) upon reaching terminal states.
 - Integrates with version control: creates version snapshots on transition when `versionOnTransition` and `versionable` are enabled.
@@ -59,12 +59,13 @@ Located in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/sc
 ### 2.1 Interface Entry Point (`Monguments`)
 Located in [`lib/monguments.ts`](file:///Users/cavargasp/projects/monguments/lib/monguments.ts):
 - Initialized with a MongoDB `Db` instance and an `MgCollections` configuration dictionary.
-- Provides operations: `process()`, `read()`, `write()`, `add()`, `set()`, `close()`, `transition()`, `getCounter()`.
+- Provides operations: `process()`, `read()`, `write()`, `add()`, `set()`, `close()`, `transition()`, `count()`, `getCounter()`, `getCollection()`.
+- Supports optional `advancedPermissions` in `process()` and `transition()` for field projections (`read`/`readList`) and workflow action validation (`transition`).
 
 ### 2.2 Collections Configuration (`MgCollectionProperties`)
-Defined in [`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts):
+Defined in [`lib/types.ts`](file:///Users/cavargasp/projects/monguments/lib/types.ts):
 ```typescript
-export interface MgCollectionProperties {
+export type MgCollectionProperties = {
   id?: string;             // Document ID field name (default: '_id')
   idAuto?: boolean;         // Auto-increment numeric ID using counters collection
   owner?: string;          // User ID field name for ownership check
@@ -74,6 +75,11 @@ export interface MgCollectionProperties {
   closable?: boolean;      // Enable document closure feature
   closeTime?: number;      // Lock duration before auto-closing
   exclusive?: boolean;     // Exclusive ownership write lock
+  upsert?: boolean;        // Enable upsert for set operations
+  maxLimit?: number;       // Maximum read query pagination clamp (default: 1000)
+  regex?: Array<string> | '*'; // Fields permitted for regular expression queries
+  regexFullSearch?: boolean;   // Enable partial/substring regex search (default: false)
+  projections?: any[];     // Custom indexed projection array
   add?: string[] | '*';    // Allowed fields for add operations
   set?: string[] | '*';    // Allowed fields for set operations
   addClosed?: string[] | '*';
@@ -89,11 +95,12 @@ Located in [`lib/docs-process.ts`](file:///Users/cavargasp/projects/monguments/l
 - Validates request payload, permissions string, connection, and collection configuration.
 - Routes requests to individual operation handlers:
   - `'write'`: Full document creation / overwrite.
-  - `'read'`: Query single or multiple active documents.
-  - `'readList'`: List processing with aggregation, lookup, sorting, and pagination.
-  - `'set'`: Partial field updates.
+  - `'read'`: Query single or multiple active documents (supports `advancedPermissions` projection).
+  - `'readList'`: List processing with aggregation, lookup, sorting, projection, and pagination.
+  - `'set'`: Partial field updates (supports `upsert`).
   - `'add'`: Array/field increments and appending.
   - `'close'`: Lock document state.
+  - `'transition'`: Execute state machine workflow transitions.
   - `'count'`: Count documents matching query.
 
 ---
@@ -103,27 +110,28 @@ Located in [`lib/docs-process.ts`](file:///Users/cavargasp/projects/monguments/l
 ```
 monguments/
 ├── lib/
-│   ├── check-data.ts        # Input validation helpers
-│   ├── db-link.ts           # MongoDB collection helper and link resolver
-│   ├── docs-process.ts      # Main process entrypoint and router
-│   ├── docs-read.ts         # High-level read handler
-│   ├── docs-set.ts          # High-level set handler
-│   ├── docs-write.ts        # High-level write handler
-│   ├── has-permission.ts    # Permission validation logic
-│   ├── index.ts             # Exported library entry point
-│   ├── interfaces.ts        # TypeScript types, classes, interfaces
-│   ├── monguments.ts        # Core Monguments class
-│   ├── operation-add.ts     # Add operation implementation
-│   ├── operation-close.ts   # Close operation implementation
-│   ├── operation-read.ts    # Read and aggregation pipelines
-│   ├── operation-set.ts     # Set operation implementation
+│   ├── db-link.ts              # MongoDB collection helper and link resolver
+│   ├── docs-process.ts         # Main process entrypoint and router
+│   ├── docs-read.ts            # High-level read handler
+│   ├── docs-set.ts             # High-level set handler
+│   ├── docs-write.ts           # High-level write handler
+│   ├── has-permission.ts       # Permission validation logic
+│   ├── index.ts                # Exported library entry point
+│   ├── monguments.ts           # Core Monguments class
+│   ├── operation-add.ts        # Add operation implementation
+│   ├── operation-close.ts      # Close operation implementation
+│   ├── operation-read.ts       # Read and aggregation pipelines
+│   ├── operation-set.ts        # Set operation implementation
 │   ├── operation-transition.ts # State machine workflow transition handler
-│   ├── operation-write.ts   # Write operation implementation
-│   ├── schemas.ts           # Zod runtime validation schemas
-│   └── tools.ts             # Utility functions
-├── test/                    # Vitest unit test files
+│   ├── operation-write.ts      # Write operation implementation
+│   ├── query-validator.ts      # NoSQL injection prevention & query sanitizer
+│   ├── schemas.ts              # Zod runtime validation schemas
+│   ├── tools.ts                # Utility functions
+│   └── types.ts                # TypeScript types, classes, interfaces
+├── test/                       # Vitest unit & e2e test suites
 ├── docs/
-│   ├── architecture.md      # This document
-│   ├── publishing.md        # NPM publishing guide
-│   └── workflows.md         # Document workflows & state machines guide
+│   ├── architecture.md         # This document
+│   ├── publishing.md           # NPM publishing guide
+│   ├── security-nosql-injection.md # Security & NoSQL injection safeguard report
+│   └── workflows.md            # Document workflows & state machines guide
 ```

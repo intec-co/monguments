@@ -141,6 +141,10 @@ const collections: MgCollections = {
     closable: true,
     closeTime: 0,
     exclusive: false,
+    upsert: false,           // Enable upsert during set operations
+    maxLimit: 500,           // Maximum pagination limit for read queries
+    regex: ['title', 'tags'], // Fields allowed for regular expression queries (or '*')
+    regexFullSearch: false,  // If true, allows unanchored/substring regex searches
     add: ['tags', 'views'],
     set: ['title', 'body'],
     addClosed: ['views'],   // Fields editable even when document is closed
@@ -151,7 +155,7 @@ const collections: MgCollections = {
       initialState: 'draft',
       transitions: [
         { from: 'draft', to: 'pending_approval', requiredFields: ['reviewerId'] },
-        { from: 'pending_approval', to: 'published', allowedRoles: ['admin', 'editor'], autoClose: true }
+        { from: 'pending_approval', to: 'published', allowedActions: ['approve', 'publish'], autoClose: true }
       ]
     },
     properties: {
@@ -178,6 +182,11 @@ const collections: MgCollections = {
 | `closable` | `boolean` | `false` | Support document locking (`_closed: true`). |
 | `closeTime` | `number` | `0` | Time threshold required for closing. |
 | `exclusive` | `boolean` | `false` | Restrict modifications exclusively to the document creator. |
+| `upsert` | `boolean` | `false` | Enable document upserting when performing `set` operations. |
+| `maxLimit` | `number` | `1000` | Maximum limit clamped on `read` / `readList` operations to protect against memory exhaustion. |
+| `regex` | `string[] \| '*'` | `undefined` | Whitelisted field names permitted in `$regex` search filters. |
+| `regexFullSearch` | `boolean` | `false` | When `false` (default), forces `^` anchor and disallows leading wildcards (`.*`, `.+`). When `true`, permits partial/substring regex searching. |
+| `projections` | `any[]` | `undefined` | Custom projection definitions indexed by permissions string index. |
 | `add` | `string[] \| '*'` | `[]` | Fields allowed for `add` operations (pushing to arrays or incrementing numbers). |
 | `set` | `string[] \| '*'` | `[]` | Fields allowed for `set` operations (partial update). |
 | `addClosed` | `string[] \| '*'` | `[]` | Fields allowed for `add` even when document is closed. |
@@ -248,23 +257,28 @@ Monguments manages metadata properties based on your collection configuration:
 
 ### Unified Process Entrypoint (`process`)
 
-The `process` method parses `request.operation` and executes the matching operation with full permission validation.
+The `process` method parses `request.operation` and executes the matching operation with full permission validation. You can optionally supply `advancedPermissions` to define explicit field projections (for `read`/`readList`) or authorized action roles (for `transition`).
 
 ```typescript
-import { MgRequest } from 'monguments';
+import { MgRequest, AdvancedPermission } from 'monguments';
 
 const request: MgRequest = {
   user: 42,
   ips: ['10.0.0.1'],
-  operation: 'write',
-  data: { title: 'New Article', body: 'Article content...' }
+  operation: 'read',
+  data: { status: 'active' }
 };
 
-const result = await monguments.process('articles', request, 'rw');
-// Returns: { data: { ...savedDoc }, response: { msg: 'ok' } }
+// Optional: specify field projections (supports dot notation, e.g. 'parent.child')
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'read', value: ['title', 'price', 'category.name'] }
+];
+
+const result = await monguments.process('articles', request, 'rw', advancedPermissions);
+// Returns: { data: [ ...projectedDocs ], response: { msg: 'ok' } }
 ```
 
-Supported `operation` values: `'read'`, `'readList'`, `'write'`, `'set'`, `'add'`, `'close'`, `'count'`.
+Supported `operation` values: `'read'`, `'readList'`, `'write'`, `'set'`, `'add'`, `'close'`, `'transition'`, `'count'`.
 
 ---
 
@@ -362,6 +376,8 @@ const result = await monguments.close('articles', request);
 Executes document state transitions enforced by rules defined in `MgCollectionProperties.workflow`. Checks current state, transition permissions, required fields, and auto-closes terminal states.
 
 ```typescript
+import { MgRequest, AdvancedPermission } from 'monguments';
+
 const request: MgRequest = {
   user: 42,
   ips: ['127.0.0.1'],
@@ -370,8 +386,12 @@ const request: MgRequest = {
   data: { editorNotes: 'Approved for publication' }
 };
 
-const userRoles = ['editor', 'admin'];
-const result = await monguments.transition('articles', request, userRoles);
+// Supply authorized actions matching rule.allowedActions
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'transition', value: ['editor', 'admin'] }
+];
+
+const result = await monguments.transition('articles', request, advancedPermissions);
 ```
 
 ---
@@ -477,14 +497,18 @@ All incoming query payloads (`query`, `data`, and `params`) pass through [`valid
 ### 3. Denial of Service (DoS) & Memory Safeguards
 - **Maximum Nesting Depth (`MAX_DEPTH = 10`)**: Recursive payloads deeper than 10 levels are automatically rejected to protect against stack overflow attacks.
 - **Configurable Read Limits (`maxLimit`)**: Read queries enforce pagination limits. If `params.limit` exceeds the collection's `maxLimit` (or default `1000`), it is automatically clamped.
-- **ReDoS Mitigation**: Regular expressions (`$regex`) are capped at 150 characters and checked against dangerous nested quantifiers (e.g., `(a+)+`) to prevent CPU exhaustion.
 - **System Collection Protection**: Database collection access to reserved system collections (`system.*`, `admin.*`, `config.*`, `local.*`) or names containing null bytes (`\0`) is blocked.
 
-### 4. Field Whitelisting & Document Closure
+### 4. Regular Expression Whitelisting & Safeguards (`regex`, `regexFullSearch`)
+- **Field Whitelisting**: Regular expression queries are permitted only on fields explicitly declared in `conf.regex` (or when `regex: '*'`).
+- **Index Protection & Leading Wildcard Control**: By default (`regexFullSearch: false`), regex filters are automatically anchored with `^` and leading wildcards (`.*`, `.+`) are rejected to ensure database index utilization and prevent unindexed full-collection scans. When `regexFullSearch: true` is configured, substring/unanchored searches are permitted.
+- **ReDoS Mitigation**: Regular expression patterns are capped at 150 characters and evaluated against catastrophic backtracking vulnerabilities (nested quantifiers such as `(a+)+` or `(a*)*`).
+
+### 5. Field Whitelisting & Document Closure
 - **Field White-Listing**: Partial update operations (`set`, `add`) restrict field modification strictly to arrays configured in `set` and `add` properties (or `'*'`).
 - **Document Locking (`_closed: true`)**: Closed documents reject standard modification attempts unless fields are whitelisted under `setClosed` or `addClosed`.
 
-### 5. Audit Trail & Traceability Metadata (`_w`)
+### 6. Audit Trail & Traceability Metadata (`_w`)
 Every write, update, or state change automatically stamps the document with a non-repudiable audit object:
 ```json
 {
@@ -535,7 +559,10 @@ import {
   MgResponse,
   MgLink,
   MongoLookup,
-  MongoLookupPipeLine
+  MongoLookupPipeLine,
+  AdvancedPermission,
+  MgStateTransition,
+  MgWorkflowConfig
 } from 'monguments';
 ```
 

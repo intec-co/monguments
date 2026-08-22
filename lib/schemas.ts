@@ -44,7 +44,8 @@ export const mgCollectionPropertiesSchema = z.object({
 	projections: z.array(z.any()).optional(),
 	maxLimit: z.number().optional(),
 	workflow: mgWorkflowConfigSchema.optional(),
-	regex: z.union([z.array(z.string()), z.literal('*')]).optional()
+	regex: z.union([z.array(z.string()), z.literal('*')]).optional(),
+	regexFullSearch: z.boolean().optional()
 });
 
 export const mgCollectionsSchema = z.record(z.string(), mgCollectionPropertiesSchema);

@@ -30,6 +30,18 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 		}
 	};
 
+	const fullSearchConf: MgCollectionProperties = {
+		regex: ['title', 'category'],
+		regexFullSearch: true,
+		properties: {
+			closed: '_closed',
+			date: '_date',
+			history: '_h',
+			isLast: '_isLast',
+			w: '_w'
+		}
+	};
+
 	describe('validateRegexPattern', () => {
 		it('should allow safe regex patterns', () => {
 			expect(validateRegexPattern('searchToken').valid).toBe(true);
@@ -50,7 +62,7 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			expect(res.reason).toContain('ReDoS');
 		});
 
-		it('should reject patterns with leading wildcards (.* or .+)', () => {
+		it('should reject patterns with leading wildcards (.* or .+) by default', () => {
 			expect(validateRegexPattern('.*abc').valid).toBe(false);
 			expect(validateRegexPattern('.+abc').valid).toBe(false);
 			expect(validateRegexPattern('^.*abc').valid).toBe(false);
@@ -58,6 +70,19 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 
 			const res = validateRegexPattern('.*abc');
 			expect(res.reason).toContain('comodines iniciales');
+		});
+
+		it('should allow leading wildcards when allowLeadingWildcard is true', () => {
+			expect(validateRegexPattern('.*abc', true).valid).toBe(true);
+			expect(validateRegexPattern('.+abc', true).valid).toBe(true);
+			expect(validateRegexPattern('^.*abc', true).valid).toBe(true);
+			expect(validateRegexPattern('^.+abc', true).valid).toBe(true);
+		});
+
+		it('should still reject ReDoS and length > 150 even when allowLeadingWildcard is true', () => {
+			const redos = '(a+)+';
+			expect(validateRegexPattern(redos, true).valid).toBe(false);
+			expect(validateRegexPattern('a'.repeat(151), true).valid).toBe(false);
 		});
 	});
 
@@ -98,7 +123,7 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			expect(res.reason).toContain("El campo 'description' no está habilitado para búsqueda por regex");
 		});
 
-		it('should prepend ^ to string $regex if not present in readList for allowed fields', () => {
+		it('should prepend ^ to string $regex if not present in readList for allowed fields by default', () => {
 			const query = { title: { $regex: 'book' } };
 			const res = processAndValidateRegex(query, sampleConf, 'readList');
 			expect(res.valid).toBe(true);
@@ -112,7 +137,7 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			expect(query.title.$regex).toBe('^book');
 		});
 
-		it('should prepend ^ to RegExp source in readList for allowed fields', () => {
+		it('should prepend ^ to RegExp source in readList for allowed fields by default', () => {
 			const query = { title: /book/i };
 			const res = processAndValidateRegex(query, sampleConf, 'readList');
 			expect(res.valid).toBe(true);
@@ -126,11 +151,72 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			expect(query.customField.$regex).toBe('^token');
 		});
 
-		it('should reject queries with leading wildcards in readList', () => {
+		it('should reject queries with leading wildcards in readList by default', () => {
 			const query = { title: { $regex: '.*book' } };
 			const res = processAndValidateRegex(query, sampleConf, 'readList');
 			expect(res.valid).toBe(false);
 			expect(res.reason).toContain('comodines iniciales');
+		});
+
+		describe('when regexFullSearch is true', () => {
+			it('should NOT prepend ^ to string $regex query', () => {
+				const query = { title: { $regex: 'book' } };
+				const res = processAndValidateRegex(query, fullSearchConf, 'readList');
+				expect(res.valid).toBe(true);
+				expect(query.title.$regex).toBe('book');
+			});
+
+			it('should preserve explicit ^ if provided in string $regex query', () => {
+				const query = { title: { $regex: '^book' } };
+				const res = processAndValidateRegex(query, fullSearchConf, 'readList');
+				expect(res.valid).toBe(true);
+				expect(query.title.$regex).toBe('^book');
+			});
+
+			it('should NOT prepend ^ to RegExp source', () => {
+				const query = { title: /book/i };
+				const res = processAndValidateRegex(query, fullSearchConf, 'readList');
+				expect(res.valid).toBe(true);
+				expect(query.title.source).toBe('book');
+			});
+
+			it('should NOT prepend ^ to RegExp inside array', () => {
+				const query = { title: { $in: [/book/i] } };
+				const res = processAndValidateRegex(query, fullSearchConf, 'readList');
+				expect(res.valid).toBe(true);
+				expect(query.title.$in[0].source).toBe('book');
+			});
+
+			it('should allow leading wildcards (.* and .+) in string $regex and RegExp', () => {
+				const query1 = { title: { $regex: '.*book' } };
+				const res1 = processAndValidateRegex(query1, fullSearchConf, 'readList');
+				expect(res1.valid).toBe(true);
+				expect(query1.title.$regex).toBe('.*book');
+
+				const query2 = { title: /.+book/i };
+				const res2 = processAndValidateRegex(query2, fullSearchConf, 'readList');
+				expect(res2.valid).toBe(true);
+				expect(query2.title.source).toBe('.+book');
+			});
+
+			it('should still reject ReDoS and length > 150 in regexFullSearch mode', () => {
+				const queryRedos = { title: { $regex: '(a+)+' } };
+				const resRedos = processAndValidateRegex(queryRedos, fullSearchConf, 'readList');
+				expect(resRedos.valid).toBe(false);
+				expect(resRedos.reason).toContain('ReDoS');
+
+				const queryLong = { title: { $regex: 'a'.repeat(151) } };
+				const resLong = processAndValidateRegex(queryLong, fullSearchConf, 'readList');
+				expect(resLong.valid).toBe(false);
+				expect(resLong.reason).toContain('exceeds maximum allowed length');
+			});
+
+			it('should still reject unallowed fields in regexFullSearch mode', () => {
+				const query = { unallowedField: { $regex: 'book' } };
+				const res = processAndValidateRegex(query, fullSearchConf, 'readList');
+				expect(res.valid).toBe(false);
+				expect(res.reason).toContain("El campo 'unallowedField' no está habilitado para búsqueda por regex");
+			});
 		});
 	});
 
@@ -149,6 +235,7 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			fakeLink = {
 				getCollectionProperties: (coll: string) => {
 					if (coll === 'books') return sampleConf;
+					if (coll === 'fullBooks') return fullSearchConf;
 					return undefined;
 				},
 				collection: () => ({
@@ -168,7 +255,7 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			expect(result.response?.error).toBe('No se permite el uso de expresiones regulares en la operación read');
 		});
 
-		it('should process readList successfully and prepend ^ to $regex query', async () => {
+		it('should process readList successfully and prepend ^ to $regex query by default', async () => {
 			const req: MgRequest = {
 				user: 1,
 				operation: 'readList',
@@ -178,6 +265,32 @@ describe('Regex Validation & Optimization Unit Tests', () => {
 			const result = await readList(fakeLink, 'books', req, 'R');
 			expect(result.response?.error).toBeUndefined();
 			expect(req.data.title.$regex).toBe('^book');
+			expect(result.data).toBeDefined();
+		});
+
+		it('should process readList without prepending ^ when collection has regexFullSearch: true', async () => {
+			const req: MgRequest = {
+				user: 1,
+				operation: 'readList',
+				data: { title: { $regex: 'book' } }
+			};
+
+			const result = await readList(fakeLink, 'fullBooks', req, 'R');
+			expect(result.response?.error).toBeUndefined();
+			expect(req.data.title.$regex).toBe('book');
+			expect(result.data).toBeDefined();
+		});
+
+		it('should allow leading wildcards in readList when collection has regexFullSearch: true', async () => {
+			const req: MgRequest = {
+				user: 1,
+				operation: 'readList',
+				data: { title: { $regex: '.*book' } }
+			};
+
+			const result = await readList(fakeLink, 'fullBooks', req, 'R');
+			expect(result.response?.error).toBeUndefined();
+			expect(req.data.title.$regex).toBe('.*book');
 			expect(result.data).toBeDefined();
 		});
 

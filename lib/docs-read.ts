@@ -1,6 +1,6 @@
 import { read } from './operation-read';
 import { hasPermission } from './has-permission';
-import { MgCollectionProperties, MgLink, MgRequest, MgResult } from './types';
+import { AdvancedPermission, MgCollectionProperties, MgLink, MgRequest, MgResult } from './types';
 import { Link } from './db-link';
 
 function verifyPermissions(singleLink: MgLink, collectionConf: MgCollectionProperties, collectionName: string): boolean {
@@ -120,7 +120,13 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 	}
 }
 
-function checkRequest(mongo: Link, collection: string, req: MgRequest, permissions: string): string {
+function checkRequest(
+	mongo: Link,
+	collection: string,
+	req: MgRequest,
+	permissions: string,
+	advancedPermissions?: AdvancedPermission[]
+): string {
 	const permission = permissions.charAt(0);
 	const collectionConf = mongo.getCollectionProperties(collection);
 	if (!collectionConf) {
@@ -130,7 +136,26 @@ function checkRequest(mongo: Link, collection: string, req: MgRequest, permissio
 	if (!hasPermission(permission, owner, req)) {
 		return 'No tiene permisos para esta operación';
 	}
-	if (collectionConf.projections) {
+
+	const readAdv = advancedPermissions?.find((ap) => ap.operation === req.operation) ||
+		advancedPermissions?.find((ap) => ap.operation === 'read');
+
+	if (readAdv) {
+		if (Array.isArray(readAdv.value) && readAdv.value.length > 0 && !readAdv.value.includes('*')) {
+			const project: Record<string, number> = {};
+			for (const field of readAdv.value) {
+				if (typeof field === 'string' && field.trim().length > 0) {
+					project[field.trim()] = 1;
+				}
+			}
+			if (Object.keys(project).length > 0) {
+				if (!req.params) {
+					req.params = {};
+				}
+				req.params.project = project;
+			}
+		}
+	} else if (collectionConf.projections) {
 		const projectIdx = parseInt(permissions.charAt(2), 10) || 0;
 		if (!req.params) {
 			req.params = {};
@@ -140,14 +165,20 @@ function checkRequest(mongo: Link, collection: string, req: MgRequest, permissio
 	return '';
 }
 
-export async function readDoc(mongo: Link, collection: string, req: MgRequest, permissions: string): Promise<MgResult> {
-	const error = checkRequest(mongo, collection, req, permissions);
+export async function readDoc(
+	mongo: Link,
+	collection: string,
+	req: MgRequest,
+	permissions: string,
+	advancedPermissions?: AdvancedPermission[]
+): Promise<MgResult> {
+	req.operation = 'read';
+	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);
 	if (error) {
 		return { response: { error } };
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {
-		req.operation = 'read';
 		const cursor = read(mongo, collection, req, 'read');
 		const doc = await cursor.next();
 		if (!doc) {
@@ -159,14 +190,20 @@ export async function readDoc(mongo: Link, collection: string, req: MgRequest, p
 	}
 }
 
-export async function readList(mongo: Link, collection: string, req: MgRequest, permissions: string): Promise<MgResult> {
-	const error = checkRequest(mongo, collection, req, permissions);
+export async function readList(
+	mongo: Link,
+	collection: string,
+	req: MgRequest,
+	permissions: string,
+	advancedPermissions?: AdvancedPermission[]
+): Promise<MgResult> {
+	req.operation = 'readList';
+	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);
 	if (error) {
 		return { response: { error } };
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {
-		req.operation = 'readList';
 		const cursor = read(mongo, collection, req, 'readList');
 		const array = await cursor.toArray();
 		if (!(array && array.length)) {
@@ -177,3 +214,4 @@ export async function readList(mongo: Link, collection: string, req: MgRequest, 
 		return { response: { error: err?.message || 'Error al leer documentos' } };
 	}
 }
+

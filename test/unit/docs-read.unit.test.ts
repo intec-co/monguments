@@ -2,7 +2,7 @@ import { vi, Mock } from 'vitest';
 import { readDoc, readList } from '../../lib/docs-read';
 import { read } from '../../lib/operation-read';
 import { hasPermission } from '../../lib/has-permission';
-import { MgRequest } from '../../lib/interfaces';
+import { MgRequest } from '../../lib/types';
 
 vi.mock('../../lib/operation-read', () => ({
 	read: vi.fn()
@@ -148,6 +148,100 @@ describe('DocsRead', () => {
 			expect(mockReq.params!.project).toBe('proj2');
 		});
 
+		it('should set request projection from advancedPermissions with nested fields', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any;
+			const advancedPermissions = [
+				{ operation: 'read', value: ['name', 'parent.children', 'profile.address.city'] }
+			];
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
+
+			expect(mockReq.params!.project).toEqual({
+				name: 1,
+				'parent.children': 1,
+				'profile.address.city': 1
+			});
+		});
+
+		it('should prioritize advancedPermissions projection over collection-level projections', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1', projections: [{ defaultProp: 1 }] });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any;
+			const advancedPermissions = [
+				{ operation: 'read', value: ['parent.children'] }
+			];
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r-0', advancedPermissions);
+
+			expect(mockReq.params!.project).toEqual({
+				'parent.children': 1
+			});
+		});
+
+		it('should not set project filter when advancedPermissions value is empty (default all fields)', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any;
+			const advancedPermissions = [
+				{ operation: 'read', value: [] }
+			];
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
+
+			expect(mockReq.params?.project).toBeUndefined();
+		});
+
+		it('should not set project filter when advancedPermissions value is ["*"] (all fields)', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any;
+			const advancedPermissions = [
+				{ operation: 'read', value: ['*'] }
+			];
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
+
+			expect(mockReq.params?.project).toBeUndefined();
+		});
+
+		it('should set request projection in readList using operation "readList" or "read"', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const mockCursor = { toArray: vi.fn().mockResolvedValue([{ id: 1 }]) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			mockReq.params = undefined as any;
+			const advancedPermissions = [
+				{ operation: 'readList', value: ['parent.children', 'title'] }
+			];
+
+			await readList(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
+
+			expect(mockReq.params!.project).toEqual({
+				'parent.children': 1,
+				title: 1
+			});
+		});
+
 		it('should log error when verifyPermissions returns false during link checks', async () => {
 			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
 				if (collName === 'testColl') return { owner: 'user1' };
@@ -162,7 +256,7 @@ describe('DocsRead', () => {
 			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1, linkedId: 'abc' }) };
 			(read as Mock).mockReturnValue(mockCursor);
 
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
 			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
 
@@ -402,7 +496,7 @@ describe('DocsRead', () => {
 			});
 			(hasPermission as Mock).mockReturnValue(true);
 
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
 			mockReq.params = {
 				link: [{

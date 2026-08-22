@@ -66,6 +66,11 @@ export interface MgCollectionProperties {
   closable?: boolean;                 // Support document state closing (default: false)
   closeTime?: number;                 // Threshold for close operations (default: 0)
   exclusive?: boolean;                // Restrict writes strictly to owner (default: false)
+  upsert?: boolean;                   // Enable upsert on 'set' operations (default: false)
+  maxLimit?: number;                  // Maximum read query pagination clamp (default: 1000)
+  regex?: string[] | '*';             // Fields allowed for $regex queries
+  regexFullSearch?: boolean;          // If true, enables partial/substring regex search (default: false)
+  projections?: any[];                // Custom indexed projections configuration
   add?: string[] | '*';               // Allowed fields for 'add' operation (push/inc)
   set?: string[] | '*';               // Allowed fields for 'set' operation (partial update)
   addClosed?: string[] | '*';         // Allowed fields for 'add' when document is closed
@@ -78,7 +83,7 @@ export interface MgCollectionProperties {
 export interface MgStateTransition {
   from: string | string[];            // Origin state(s) or '*' for any state
   to: string;                         // Target state name
-  allowedRoles?: string[];            // User roles authorized for this transition
+  allowedActions?: string[];          // User actions/roles authorized for this transition
   requiredFields?: string[];          // Required fields present in payload/doc for transition
   autoClose?: boolean;                // Auto-close document (_closed: true) on transition
 }
@@ -146,7 +151,10 @@ const collections: MgCollections = {
 ### Schema Constraints & Gotchas for LLMs
 1. ⚠️ **Versioning with `_id`**: If `versionable: true` and `id: '_id'`, you **MUST** specify `versionField: 'version'` (or similar custom field name). Otherwise MongoDB will fail with duplicate `_id` key errors on version creation.
 2. ⚠️ **White-listed Fields**: `add` and `set` operations silently reject or throw errors for fields NOT explicitly listed in `add` or `set` array (or set to `'*'`).
-3. ⚠️ **Required Properties**: The `properties` object is mandatory on every collection definition.
+3. ⚠️ **Regex Query Whitelisting**: Regular expression searches (`$regex`) are rejected unless the searched fields are explicitly declared in `conf.regex` (or `regex: '*'`).
+4. ⚠️ **Partial Regex Matching**: By default (`regexFullSearch: false`), queries are auto-anchored with `^` and leading wildcards (`.*`, `.+`) are blocked to maintain index efficiency. To permit substring searching, configure `regexFullSearch: true`.
+5. ⚠️ **Set with Upsert**: Set operations will return an error if a target document does not exist unless `conf.upsert: true` is set on the collection.
+6. ⚠️ **Required Properties**: The `properties` object is mandatory on every collection definition.
 
 ---
 
@@ -187,13 +195,20 @@ export interface MgRequest {
 const request: MgRequest = {
   user: 1001,
   ips: ['127.0.0.1'],
-  operation: 'write',
-  data: { title: 'New Doc', content: 'Body...' }
+  operation: 'read',
+  data: { status: 'active' }
 };
 
-const result: MgResult = await monguments.process('documents', request, 'rw');
+// Advanced permissions for field projections or transitions
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'read', value: ['title', 'parent.children'] }
+];
+
+const result: MgResult = await monguments.process('documents', request, 'rw', advancedPermissions);
 // Result structure: { data: ..., response: { msg: 'ok', error?: string } }
 ```
+- **Read field projections**: When `operation` is `'read'` (or `'readList'`), `value` projects only the specified document fields (including nested dot-notation fields such as `'parent.children'`). By default (if `value` is empty `[]`, `['*']`, or omitted), all document fields are returned.
+
 
 ---
 
@@ -276,6 +291,8 @@ const result: MgResult = await monguments.close('documents', request);
 #### 6. Transition (`monguments.transition`)
 Executes document state transitions enforced by workflow rules. Validates target state, role authorization, and required payload fields.
 ```typescript
+import { AdvancedPermission } from 'monguments';
+
 const request: MgRequest = {
   user: 1001,
   ips: ['127.0.0.1'],
@@ -284,8 +301,10 @@ const request: MgRequest = {
   data: { notes: 'Approved' }
 };
 
-const userRoles = ['editor', 'admin'];
-const result: MgResult = await monguments.transition('documents', request, userRoles);
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'transition', value: ['editor', 'admin'] }
+];
+const result: MgResult = await monguments.transition('documents', request, advancedPermissions);
 ```
 
 #### 7. Auxiliary Helpers (`getCollection`, `getCounter`)

@@ -26,6 +26,20 @@ describe('Zod Validation Unit Tests', () => {
 			expect(() => createMonguments(mockDb, validCollections)).not.toThrow();
 		});
 
+		it('should succeed when collections config includes regex and regexFullSearch', () => {
+			const mockDb: any = {};
+			const collectionsWithRegex: any = {
+				users: {
+					id: '_id',
+					versionable: false,
+					properties: validProperties,
+					regex: ['name'],
+					regexFullSearch: true
+				}
+			};
+			expect(() => createMonguments(mockDb, collectionsWithRegex)).not.toThrow();
+		});
+
 		it('should throw ZodError when properties object is missing in collections', () => {
 			const mockDb: any = {};
 			const invalidCollections: any = {

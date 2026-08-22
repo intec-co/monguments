@@ -99,9 +99,9 @@ export const docProcess = async (
 				return { response: { error: `La colección: ${collection} no esta configurada` } };
 			}
 		case 'read':
-			return readDoc(link, collection, request, permissions);
+			return readDoc(link, collection, request, permissions, advancedPermissions);
 		case 'readList':
-			return readList(link, collection, request, permissions);
+			return readList(link, collection, request, permissions, advancedPermissions);
 		case 'set':
 			return docSet(link, collection, request, permissions);
 		case 'transition':

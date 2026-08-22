@@ -16,7 +16,7 @@ Welcome to the **Monguments** library repository. This codebase provides high-le
 ## 2. Guidelines for AI Assistants & LLMs
 
 1. **Strict Type Safety & Runtime Validation**:
-   - Always preserve and update interfaces in [`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts) and Zod schemas in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts) when extending functionality or modifying request structures.
+   - Always preserve and update types and interfaces in [`lib/types.ts`](file:///Users/cavargasp/projects/monguments/lib/types.ts) and Zod schemas in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts) when extending functionality or modifying request structures.
    - Avoid using `any` unless dealing with arbitrary MongoDB queries or legacy helper dynamics.
 
 2. **Permission Checks First**:

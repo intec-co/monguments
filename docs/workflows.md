@@ -1,6 +1,6 @@
 # Document Workflows & State Machines in Monguments
 
-**Monguments** includes native State Machine engine support for MongoDB collections. This feature allows developers to define document life cycles, restrict state transitions based on user roles, enforce required payload fields during transitions, automatically close terminal documents, and seamlessly preserve version history.
+**Monguments** includes native State Machine engine support for MongoDB collections. This feature allows developers to define document life cycles, restrict state transitions based on authorized actions/roles, enforce required payload fields during transitions, automatically close terminal documents, and seamlessly preserve version history.
 
 ---
 
@@ -10,7 +10,7 @@ In many MongoDB applications, documents progress through a defined set of states
 
 Monguments provides declarative workflow management built into collection schemas:
 
-- 🔒 **Role-Based Transition Guards**: Restrict who can trigger specific state changes.
+- 🔒 **Action/Role-Based Transition Guards**: Restrict who can trigger specific state changes using `allowedActions` and `AdvancedPermission`.
 - 📋 **Payload Field Requirements**: Ensure necessary metadata or fields are supplied before a transition succeeds.
 - 🏁 **Terminal State Auto-Closure**: Lock documents (`_closed: true`) automatically upon reaching final states.
 - 🕒 **Integrated Version Control**: Create new version snapshots (`_isLast: true/false`) during state transitions.
@@ -23,22 +23,27 @@ Monguments provides declarative workflow management built into collection schema
 Workflow rules are configured on collection properties under `workflow`:
 
 ```typescript
-import { MgWorkflowConfig, MgStateTransition } from 'monguments';
+import { MgWorkflowConfig, MgStateTransition, AdvancedPermission } from 'monguments';
 
-export interface MgStateTransition {
+export type MgStateTransition = {
   from: string | Array<string>;    // Source state name(s), or '*' for any state
   to: string;                       // Target state name
-  allowedRoles?: Array<string>;     // User roles authorized for this transition
+  allowedActions?: Array<string>;   // Authorized actions/roles for this transition
   requiredFields?: Array<string>;   // Required fields in payload or existing document
   autoClose?: boolean;              // Auto-close document (_closed: true) on transition
-}
+};
 
-export interface MgWorkflowConfig {
+export type MgWorkflowConfig = {
   stateField?: string;              // State field name in document (default: '_state')
   initialState?: string;            // Default initial state (default: 'draft')
   transitions: Array<MgStateTransition>; // List of valid transition rules
   versionOnTransition?: boolean;    // Create version snapshot on transition (default: true)
-}
+};
+
+export type AdvancedPermission = {
+  operation: string;                // 'transition', 'read', etc.
+  value: string[];                  // Allowed action names or projected fields
+};
 ```
 
 ---
@@ -69,13 +74,13 @@ const collections: MgCollections = {
         {
           from: 'pending_approval',
           to: 'published',
-          allowedRoles: ['editor', 'admin'],
+          allowedActions: ['editor', 'admin'],
           autoClose: true
         },
         {
           from: '*',
           to: 'archived',
-          allowedRoles: ['admin'],
+          allowedActions: ['admin'],
           autoClose: true
         }
       ]
@@ -95,12 +100,12 @@ const collections: MgCollections = {
 
 ## 4. Executing State Transitions
 
-### Method A: Explicit Transition (`monguments.transition`)
+### Method A: Explicit Transition (`monguments.transition` or `monguments.process`)
 
 Use `transition()` to request a specific state change on a target document:
 
 ```typescript
-import { MgRequest } from 'monguments';
+import { MgRequest, AdvancedPermission } from 'monguments';
 
 const request: MgRequest = {
   user: 1001,
@@ -112,14 +117,35 @@ const request: MgRequest = {
   }
 };
 
-const userRoles = ['editor'];
-const result = await monguments.transition('articles', request, userRoles);
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'transition', value: ['editor'] }
+];
+
+const result = await monguments.transition('articles', request, advancedPermissions);
 
 if (result.response?.error) {
   console.error('Transition failed:', result.response.error);
 } else {
   console.log('Transition successful:', result.response?.msg);
 }
+```
+
+Or via unified dispatcher `monguments.process()`:
+
+```typescript
+const request: MgRequest = {
+  user: 1001,
+  operation: 'transition',
+  data: {
+    query: { _id: 'article_101' },
+    targetState: 'published',
+    editorNotes: 'Approved for publication'
+  }
+};
+
+const result = await monguments.process('articles', request, 'rw', [
+  { operation: 'transition', value: ['editor'] }
+]);
 ```
 
 ### Method B: Automatic Validation in Partial Updates (`monguments.set`)
@@ -129,7 +155,6 @@ If a user modifies the collection's `stateField` directly via `set()`, Mongument
 ```typescript
 const request: MgRequest = {
   user: 1001,
-  roles: ['editor'],
   data: {
     query: { _id: 'article_101' },
     set: {
@@ -152,13 +177,13 @@ const result = await monguments.set('articles', request);
 - Array of states: `from: ['draft', 'rejected']`
 - Wildcard (any state): `from: '*'`
 
-### 2. Role Authorization (`allowedRoles`)
-If `allowedRoles` is specified, the operator must have at least one matching role supplied in `userRoles` (or `request.roles`):
+### 2. Action / Role Authorization (`allowedActions`)
+If `allowedActions` is specified on a transition rule, the caller must supply matching actions via `advancedPermissions` (`{ operation: 'transition', value: [...] }`):
 ```typescript
 {
   from: 'pending_approval',
   to: 'published',
-  allowedRoles: ['admin', 'editor'] // Reject if user only has 'author'
+  allowedActions: ['admin', 'editor'] // Rejects if caller does not provide 'admin' or 'editor'
 }
 ```
 
@@ -187,7 +212,7 @@ When `autoClose: true`, the transition automatically marks the document as close
 ## 6. Full Working Example
 
 ```typescript
-import { mgConnectDb, MgCollections, MgRequest } from 'monguments';
+import { mgConnectDb, MgCollections, MgRequest, AdvancedPermission } from 'monguments';
 
 async function runWorkflowDemo() {
   const collections: MgCollections = {
@@ -203,7 +228,7 @@ async function runWorkflowDemo() {
         initialState: 'draft',
         transitions: [
           { from: 'draft', to: 'in_review', requiredFields: ['reviewerId'] },
-          { from: 'in_review', to: 'approved', allowedRoles: ['manager', 'admin'], autoClose: true }
+          { from: 'in_review', to: 'approved', allowedActions: ['manager', 'admin'], autoClose: true }
         ]
       },
       properties: {
@@ -237,6 +262,10 @@ async function runWorkflowDemo() {
   });
 
   // 3. Approve document as Manager (Auto-closes document)
+  const managerPerms: AdvancedPermission[] = [
+    { operation: 'transition', value: ['manager'] }
+  ];
+
   const approveRes = await monguments.transition(
     'documents',
     {
@@ -245,7 +274,7 @@ async function runWorkflowDemo() {
       targetState: 'approved',
       data: { editorNotes: 'Audited and verified' }
     },
-    ['manager'] // User roles
+    managerPerms
   );
 
   console.log('Final Approval Result:', approveRes);

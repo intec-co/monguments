@@ -56,24 +56,30 @@ Permission strings consist of 2 characters: `"<read-permission><write-permission
 Main unified entry point that routes operations by `request.operation`:
 
 ```typescript
-// Callback style
-monguments.process('myCollection', request, 'RW', (data, response) => {
-  if (response?.error) {
-    console.error('Operation failed:', response.error);
-    return;
-  }
-  console.log('Result:', data);
-});
+import { MgRequest, AdvancedPermission } from 'monguments';
+
+const request: MgRequest = {
+  user: 1001,
+  operation: 'read',
+  data: { status: 'active' }
+};
+
+// Optional advanced permissions for read field projections or workflow transitions
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'read', value: ['title', 'category.name'] }
+];
 
 // Async/Promise style
-const result = await monguments.process('myCollection', request, 'RW');
-// result = { data: ..., response: ... }
+const result = await monguments.process('myCollection', request, 'RW', advancedPermissions);
+// result = { data: ..., response: { msg: 'ok', error?: string } }
 ```
 
 ### 3.2 Read Operation (`read` / `readList`)
 - For standard find queries, `request.data` is treated as the match filter.
 - For versioned collections, `_isLast: true` is automatically injected unless overridden.
 - `params.lookup` supports single or array of MongoDB `$lookup` definitions or lookup pipelines.
+- When `advancedPermissions` is passed with `operation: 'read'` (or `'readList'`), `value` specifies the array of fields to project (e.g. `['title', 'parent.children']`). By default (empty array, `['*']`, or omitted), all document fields are returned.
+- **Regular Expressions**: `$regex` queries are validated against collection's `regex` field whitelist. By default (`regexFullSearch: false`), patterns are anchored with `^` and leading wildcards are blocked. Set `regexFullSearch: true` in schema to allow substring matching.
 
 ```typescript
 const request: MgRequestRead = {
@@ -106,13 +112,11 @@ const writeRequest: MgRequest = {
   }
 };
 
-monguments.write('articles', writeRequest, (data, response) => {
-  console.log('Saved document:', data);
-});
+const result = await monguments.write('articles', writeRequest);
 ```
 
 ### 3.4 Set Operation (`set`)
-Updates specific fields without replacing the full document or triggering complete versioning unless configured.
+Updates specific fields without replacing the full document. If `upsert: true` is set on collection properties, non-existent documents are inserted.
 
 ```typescript
 const setRequest: MgRequest = {
@@ -122,9 +126,7 @@ const setRequest: MgRequest = {
   data: { status: 'published' }
 };
 
-monguments.set('articles', setRequest, (data, response) => {
-  console.log('Fields updated');
-});
+const result = await monguments.set('articles', setRequest);
 ```
 
 ### 3.5 Close Operation (`close`)
@@ -137,9 +139,25 @@ const closeRequest: MgRequest = {
   data: { _id: 'doc123' }
 };
 
-monguments.close('articles', closeRequest, (data, response) => {
-  console.log('Document closed');
-});
+const result = await monguments.close('articles', closeRequest);
+```
+
+### 3.6 Transition Operation (`transition`)
+Executes document state transitions enforced by workflow rules. Validates target state, required fields, and caller's authorized actions.
+
+```typescript
+const transitionRequest: MgRequest = {
+  user: 42,
+  query: { _id: 'doc123' },
+  targetState: 'published',
+  data: { editorNotes: 'Approved' }
+};
+
+const advancedPermissions: AdvancedPermission[] = [
+  { operation: 'transition', value: ['editor', 'admin'] }
+];
+
+const result = await monguments.transition('articles', transitionRequest, advancedPermissions);
 ```
 
 ---

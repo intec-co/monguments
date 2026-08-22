@@ -27,7 +27,7 @@ export interface Monguments {
 	getCollectionId(collection: string): string;
 	getCollectionProperties(collection: string): MgCollectionProperties | undefined;
 	getCounter(collection: string): Promise<any>;
-	process(collection: string, request: MgRequest, permissions: string): Promise<MgResult>;
+	process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]): Promise<MgResult>;
 	read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined;
 	set(collection: string, request: MgRequest): Promise<MgResult>;
 	transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission[]): Promise<MgResult>;

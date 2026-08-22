@@ -103,7 +103,18 @@ describe('DocProcess Unit', () => {
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(readDoc).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(readDoc).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_', undefined);
+			expect(res).toEqual({ data: { id: 1 } });
+		});
+
+		it('should delegate read operation with advancedPermissions to readDoc', async () => {
+			(readDoc as Mock).mockResolvedValue({ data: { id: 1 } });
+			const req = { data: { id: 1 }, operation: 'read' };
+			const advPerms = [{ operation: 'read', value: ['name', 'parent.children'] }];
+
+			const res = await docProcess(mockLink, 'test', req, 'RW_', advPerms);
+
+			expect(readDoc).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_', advPerms);
 			expect(res).toEqual({ data: { id: 1 } });
 		});
 
@@ -113,7 +124,18 @@ describe('DocProcess Unit', () => {
 
 			const res = await docProcess(mockLink, 'test', req, 'RW_');
 
-			expect(readList).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_');
+			expect(readList).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_', undefined);
+			expect(res).toEqual({ data: [{ id: 1 }] });
+		});
+
+		it('should delegate readList operation with advancedPermissions to readList', async () => {
+			(readList as Mock).mockResolvedValue({ data: [{ id: 1 }] });
+			const req = { data: {}, operation: 'readList' };
+			const advPerms = [{ operation: 'readList', value: ['title', 'author.name'] }];
+
+			const res = await docProcess(mockLink, 'test', req, 'RW_', advPerms);
+
+			expect(readList).toHaveBeenCalledWith(mockLink, 'test', req, 'RW_', advPerms);
 			expect(res).toEqual({ data: [{ id: 1 }] });
 		});
 

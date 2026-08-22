@@ -43,6 +43,7 @@ export type MgCollectionProperties = {
 	maxLimit?: number;
 	workflow?: MgWorkflowConfig;
 	regex?: Array<string> | '*';
+	regexFullSearch?: boolean;
 }
 
 export type MgCollections = { [key: string]: MgCollectionProperties; }

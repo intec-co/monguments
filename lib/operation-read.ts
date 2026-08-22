@@ -55,7 +55,9 @@ function readDirect(mongo: Link, collection: string, query: any, params: MGParam
 }
 
 export function read(mongo: Link, collection: string, request: MgRequestRead, op?: string): FindCursor | AggregationCursor {
-	const validQuery = validateQueryFilter(request.data);
+	const conf = mongo.getCollectionProperties(collection);
+	const isFullSearch = conf?.regexFullSearch === true;
+	const validQuery = validateQueryFilter(request.data, 0, isFullSearch);
 	if (!validQuery.valid) {
 		throw new Error(validQuery.reason || 'Consulta no válida');
 	}
@@ -66,7 +68,6 @@ export function read(mongo: Link, collection: string, request: MgRequestRead, op
 		}
 	}
 
-	const conf = mongo.getCollectionProperties(collection);
 	const operation = op || (request as any).operation || 'readList';
 	const validRegex = processAndValidateRegex(request.data, conf, operation);
 	if (!validRegex.valid) {

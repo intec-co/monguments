@@ -49,7 +49,7 @@ export const validateCollectionName = (collection: string): ValidationResult => 
 /**
  * Validates regex security against ReDoS and excessive length.
  */
-export const validateRegexPattern = (pattern: any): ValidationResult => {
+export const validateRegexPattern = (pattern: any, allowLeadingWildcard: boolean = false): ValidationResult => {
 	let strPattern = pattern;
 	if (pattern instanceof RegExp) {
 		strPattern = pattern.source;
@@ -67,7 +67,7 @@ export const validateRegexPattern = (pattern: any): ValidationResult => {
 				reason: 'Regex pattern potentially vulnerable to ReDoS (nested quantifiers)'
 			};
 		}
-		if (LEADING_WILDCARD_PATTERN.test(strPattern)) {
+		if (!allowLeadingWildcard && LEADING_WILDCARD_PATTERN.test(strPattern)) {
 			return {
 				valid: false,
 				reason: "No se permiten expresiones regulares con comodines iniciales como '.*' o '.+' que anulen el índice"
@@ -104,6 +104,8 @@ export const processAndValidateRegex = (
 		return { valid: true };
 	}
 
+	const isFullSearch = conf?.regexFullSearch === true;
+
 	if (query instanceof RegExp) {
 		if (operation === 'read') {
 			return {
@@ -117,7 +119,7 @@ export const processAndValidateRegex = (
 				reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
 			};
 		}
-		const validPat = validateRegexPattern(query);
+		const validPat = validateRegexPattern(query, isFullSearch);
 		if (!validPat.valid) {
 			return validPat;
 		}
@@ -140,11 +142,11 @@ export const processAndValidateRegex = (
 						reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
 					};
 				}
-				const validPat = validateRegexPattern(item);
+				const validPat = validateRegexPattern(item, isFullSearch);
 				if (!validPat.valid) {
 					return validPat;
 				}
-				if (!item.source.startsWith('^')) {
+				if (!isFullSearch && !item.source.startsWith('^')) {
 					query[i] = new RegExp('^' + item.source, item.flags);
 				}
 			} else if (typeof item === 'object' && item !== null) {
@@ -174,17 +176,19 @@ export const processAndValidateRegex = (
 					reason: `El campo '${currentField}' no está habilitado para búsqueda por regex`
 				};
 			}
-			const validPat = validateRegexPattern(val);
+			const validPat = validateRegexPattern(val, isFullSearch);
 			if (!validPat.valid) {
 				return validPat;
 			}
-			if (typeof val === 'string') {
-				if (!val.startsWith('^')) {
-					query[key] = '^' + val;
-				}
-			} else if (val instanceof RegExp) {
-				if (!val.source.startsWith('^')) {
-					query[key] = new RegExp('^' + val.source, val.flags);
+			if (!isFullSearch) {
+				if (typeof val === 'string') {
+					if (!val.startsWith('^')) {
+						query[key] = '^' + val;
+					}
+				} else if (val instanceof RegExp) {
+					if (!val.source.startsWith('^')) {
+						query[key] = new RegExp('^' + val.source, val.flags);
+					}
 				}
 			}
 			continue;
@@ -204,11 +208,11 @@ export const processAndValidateRegex = (
 					reason: `El campo '${targetField}' no está habilitado para búsqueda por regex`
 				};
 			}
-			const validPat = validateRegexPattern(val);
+			const validPat = validateRegexPattern(val, isFullSearch);
 			if (!validPat.valid) {
 				return validPat;
 			}
-			if (!val.source.startsWith('^')) {
+			if (!isFullSearch && !val.source.startsWith('^')) {
 				query[key] = new RegExp('^' + val.source, val.flags);
 			}
 			continue;
@@ -230,7 +234,7 @@ export const processAndValidateRegex = (
  * Recursively validates that a search query filter contains only
  * allowed operators, no null/undefined injections, prototype pollution, ReDoS, or excessive depth.
  */
-export const validateQueryFilter = (query: any, depth: number = 0): ValidationResult => {
+export const validateQueryFilter = (query: any, depth: number = 0, allowLeadingWildcard: boolean = false): ValidationResult => {
 	if (depth > MAX_DEPTH) {
 		return {
 			valid: false,
@@ -251,7 +255,7 @@ export const validateQueryFilter = (query: any, depth: number = 0): ValidationRe
 	}
 
 	if (query instanceof RegExp) {
-		return validateRegexPattern(query);
+		return validateRegexPattern(query, allowLeadingWildcard);
 	}
 
 	if (Array.isArray(query)) {
@@ -262,7 +266,7 @@ export const validateQueryFilter = (query: any, depth: number = 0): ValidationRe
 					reason: 'Null or undefined item not allowed in query filter array'
 				};
 			}
-			const res = validateQueryFilter(item, depth + 1);
+			const res = validateQueryFilter(item, depth + 1, allowLeadingWildcard);
 			if (!res.valid) {
 				return res;
 			}
@@ -305,14 +309,14 @@ export const validateQueryFilter = (query: any, depth: number = 0): ValidationRe
 			}
 
 			if (key === '$regex') {
-				const regexRes = validateRegexPattern(val);
+				const regexRes = validateRegexPattern(val, allowLeadingWildcard);
 				if (!regexRes.valid) {
 					return regexRes;
 				}
 			}
 		}
 
-		const res = validateQueryFilter(val, depth + 1);
+		const res = validateQueryFilter(val, depth + 1, allowLeadingWildcard);
 		if (!res.valid) {
 			return res;
 		}
@@ -452,16 +456,18 @@ export const validateRequest = (request: any, conf?: MgCollectionProperties): Va
 		if (!res.valid) { return res; }
 	}
 
+	const isFullSearch = conf?.regexFullSearch === true;
+
 	const op = request.operation;
 	if (op === 'read' || op === 'readList' || op === 'count' || op === 'close') {
 		if (request.data) {
-			const res = validateQueryFilter(request.data);
+			const res = validateQueryFilter(request.data, 0, isFullSearch);
 			if (!res.valid) { return res; }
 			const regRes = processAndValidateRegex(request.data, conf, op);
 			if (!regRes.valid) { return regRes; }
 		}
 		if (request.query) {
-			const res = validateQueryFilter(request.query);
+			const res = validateQueryFilter(request.query, 0, isFullSearch);
 			if (!res.valid) { return res; }
 			const regRes = processAndValidateRegex(request.query, conf, op);
 			if (!regRes.valid) { return regRes; }
@@ -472,13 +478,13 @@ export const validateRequest = (request: any, conf?: MgCollectionProperties): Va
 			if (!res.valid) { return res; }
 		}
 		if (request.query) {
-			const res = validateQueryFilter(request.query);
+			const res = validateQueryFilter(request.query, 0, isFullSearch);
 			if (!res.valid) { return res; }
 		}
 	} else if (op === 'set') {
 		if (request.data) {
 			if (request.data.query) {
-				const res = validateQueryFilter(request.data.query);
+				const res = validateQueryFilter(request.data.query, 0, isFullSearch);
 				if (!res.valid) { return res; }
 			}
 			if (request.data.set) {
@@ -487,7 +493,7 @@ export const validateRequest = (request: any, conf?: MgCollectionProperties): Va
 			}
 		}
 		if (request.query) {
-			const res = validateQueryFilter(request.query);
+			const res = validateQueryFilter(request.query, 0, isFullSearch);
 			if (!res.valid) { return res; }
 		}
 		if (request.set) {
@@ -496,7 +502,7 @@ export const validateRequest = (request: any, conf?: MgCollectionProperties): Va
 		}
 	} else {
 		if (request.query) {
-			const res = validateQueryFilter(request.query);
+			const res = validateQueryFilter(request.query, 0, isFullSearch);
 			if (!res.valid) { return res; }
 		}
 	}

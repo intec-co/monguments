@@ -1,8 +1,8 @@
 # Security Report: Advanced Safeguards & NoSQL Injection Prevention in Monguments
 
 **Project**: Monguments (`monguments`)  
-**Date**: 2026-07-22  
-**Module**: Query Validation, Advanced Safeguards & Security ([`lib/query-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/query-validator.ts), [`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts))  
+**Date**: 2026-08-22  
+**Module**: Query Validation, Advanced Safeguards & Security ([`lib/query-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/query-validator.ts), [`lib/types.ts`](file:///Users/cavargasp/projects/monguments/lib/types.ts))  
 **Status**: Implemented and Verified  
 
 ---
@@ -18,18 +18,19 @@ The **Monguments** library implements a comprehensive defense-in-depth architect
 ### 1.2 Collection Read Limit (`maxLimit`) Safeguard
 - **Risk Mitigated**: Denial of Service (DoS) and excessive memory consumption from unpaginated or massive database read queries.
 - **Implementation**:
-  - Optional `maxLimit?: number` property in `MgCollectionProperties` ([`lib/interfaces.ts`](file:///Users/cavargasp/projects/monguments/lib/interfaces.ts)).
+  - Optional `maxLimit?: number` property in `MgCollectionProperties` ([`lib/types.ts`](file:///Users/cavargasp/projects/monguments/lib/types.ts)).
   - In `read()` ([`lib/operation-read.ts`](file:///Users/cavargasp/projects/monguments/lib/operation-read.ts)), `params.limit` is automatically clamped to `conf.maxLimit` (or 1000 by default) if a caller requests a larger limit.
 
 ### 1.3 Strict Collection Name Validation (`validateCollectionName`)
 - **Risk Mitigated**: Unauthorized access or tampering with internal/system MongoDB collections.
 - **Implementation**: Rejects collection names containing null bytes (`\0`) or starting with system reserved prefixes (`system.`, `admin.`, `config.`, `local.`).
 
-### 1.4 Regular Expression ReDoS Mitigation (`validateRegexPattern`)
-- **Risk Mitigated**: Regular Expression Denial of Service (ReDoS) attacks caused by catastrophic backtracking in nested quantifiers.
+### 1.4 Regular Expression Whitelisting & Safeguards (`regex`, `regexFullSearch`, `validateRegexPattern`)
+- **Risk Mitigated**: Regular Expression Denial of Service (ReDoS) attacks caused by catastrophic backtracking in nested quantifiers, unindexed full-table scans, and unauthorized regex searches.
 - **Implementation**:
-  - Restricts `$regex` pattern length to a maximum of 150 characters.
-  - Blocks patterns with dangerous nested quantifiers (e.g., `(a+)+`, `(a*)*`).
+  - **Field Whitelisting**: Regular expressions are only permitted on fields explicitly listed in `conf.regex` (or when `regex: '*'`).
+  - **Index Protection & Leading Wildcard Restriction**: By default (`regexFullSearch: false`), queries without `^` are anchored with `^` and leading wildcards (`.*`, `.+`) are rejected to prevent unindexed table scans. Setting `regexFullSearch: true` allows partial/substring queries.
+  - **ReDoS Protection**: Restricts `$regex` pattern length to a maximum of 150 characters and blocks patterns with dangerous nested quantifiers (e.g., `(a+)+`, `(a*)*`).
 
 ### 1.5 Runtime Schema & Payload Sanitization (Zod)
 - **Risk Mitigated**: Malformed payload attacks, invalid collection schema configurations, and permission structure tampering.
@@ -45,6 +46,7 @@ The automated unit test suite validates security safeguards across multiple test
 
 - [`test/unit/query-validator.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/query-validator.unit.test.ts): NoSQL operator injection, null/undefined rejection, prototype pollution keys.
 - [`test/unit/query-validator-edgecases.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/query-validator-edgecases.unit.test.ts): Prototype pollution evasion, case variations, `Object.create(null)` handling.
+- [`test/unit/regex-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/regex-validation.unit.test.ts): Regular expression length caps, ReDoS patterns, leading wildcard restrictions, and field whitelisting.
 - [`test/unit/security-hardening.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/security-hardening.unit.test.ts): Depth limits, per-collection `maxLimit`, system collections, and ReDoS regex patterns.
 - [`test/unit/zod-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/zod-validation.unit.test.ts): Runtime Zod schema validation for collection configurations, request parameters, and permission strings.
 
