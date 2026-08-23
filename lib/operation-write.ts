@@ -241,7 +241,7 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 		if (conf.id !== '_id' && request.data._id) {
 			delete request.data._id;
 		}
-		const data = structuredClone(request.data);
+		const data = { ...request.data };
 		data[p.w] = w;
 		switch (action) {
 			case 'newDoc':

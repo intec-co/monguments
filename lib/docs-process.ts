@@ -5,7 +5,7 @@ import { docSet } from './docs-set';
 import { docWrite } from './docs-write';
 import { hasPermission } from './has-permission';
 import { AdvancedPermission, MgCollectionProperties, MgRequest, MgResult } from './types';
-import { mgRequestSchema, advancedPermissionsSchema } from './schemas';
+import { validateMgRequest, validateAdvancedPermissions } from './request-validator';
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { transition } from './operation-transition';
@@ -37,15 +37,15 @@ const check = (
 		return `Operation ${msg}`;
 	}
 
-	const reqParsed = mgRequestSchema.safeParse(request);
-	if (!reqParsed.success) {
-		return `Invalid request: ${reqParsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+	const reqErr = validateMgRequest(request);
+	if (reqErr) {
+		return reqErr;
 	}
 
 	if (advancedPermissions !== undefined) {
-		const advParsed = advancedPermissionsSchema.safeParse(advancedPermissions);
-		if (!advParsed.success) {
-			return `Invalid advancedPermissions: ${advParsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+		const advErr = validateAdvancedPermissions(advancedPermissions);
+		if (advErr) {
+			return advErr;
 		}
 	}
 

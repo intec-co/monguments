@@ -31,7 +31,7 @@ A high-level TypeScript document management library for MongoDB providing built-
   - [MongoDB `$lookup` Stages](#mongodb-lookup-stages)
   - [Collection Links](#collection-links)
 - [Security & Hardening](#security--hardening)
-- [Runtime Validation & Schemas (Zod)](#runtime-validation--schemas-zod)
+- [Runtime Validation & Schemas](#runtime-validation--schemas)
 - [TypeScript Interfaces](#typescript-interfaces)
 - [AI & LLM Integration](#ai--llm-integration)
 - [Publishing](#publishing)
@@ -48,7 +48,7 @@ A high-level TypeScript document management library for MongoDB providing built-
 - 🔒 **Document Closure**: Lock documents (`_closed: true`) to prevent unauthorized modifications while optionally allowing specific field updates (`addClosed`, `setClosed`).
 - 🔢 **Auto-Increment Numeric IDs**: Built-in sequence counter support using an internal `counters` collection (`idAuto: true`).
 - 🔗 **Aggregations & Lookups**: Simplified `$lookup` aggregation pipelines and relational collection linking.
-- 🛡️ **Runtime Schema Validation**: Built-in Zod schema validation for collection configurations (`MgCollections`), request payloads (`MgRequest`), and permission parameters (`AdvancedPermission`).
+- 🛡️ **Hybrid Runtime Validation**: Strict Zod schema validation for collection configurations (`MgCollections`) during initialization, paired with high-performance native request validation for incoming operations (`MgRequest`, `AdvancedPermission`).
 
 ---
 
@@ -523,9 +523,11 @@ For detailed security reports and benchmarks, see the [Security & NoSQL Injectio
 
 ---
 
-## Runtime Validation & Schemas (Zod)
+## Runtime Validation & Schemas
 
-Monguments uses **Zod** to validate schema configurations and operation request parameters at runtime, ensuring robust type safety and early failure before querying MongoDB.
+Monguments implements a high-performance **hybrid validation architecture**:
+- **Initialization Layer (Zod)**: Uses **Zod** (`mgCollectionsSchema`) to strictly validate schema configurations when initializing `Monguments`.
+- **Execution Hot Path (Native Validator)**: Uses high-performance native validation ([`request-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/request-validator.ts)) on every incoming `process()` request to eliminate overhead while preserving type safety and early failure.
 
 ### 1. Collection Configuration Validation (`mgCollectionsSchema`)
 When instantiating `Monguments` or `mgConnectDb()`, the `collections` map is validated against `mgCollectionsSchema`:
@@ -533,11 +535,11 @@ When instantiating `Monguments` or `mgConnectDb()`, the `collections` map is val
 - Ensures required metadata field mappings exist (`properties.isLast`, `properties.w`, `properties.closed`, `properties.date`, `properties.history`).
 - Throws a descriptive `Error` (`Invalid collection properties configuration: ...`) if properties are missing or misconfigured.
 
-### 2. Request & Permission Validation (`mgRequestSchema`, `advancedPermissionSchema`)
-Every operation routed through `process()` is validated:
-- `mgRequestSchema`: Verifies `user` (number/string), optional `ips`, valid `operation` string, and payload parameters.
-- `advancedPermissionSchema`: Validates 2-character permission strings (e.g., `'rw'`, `'RW'`, `'Rc'`) or structured role-based permission definitions.
-- Returns structured error responses (`{ data: null, response: { error: 'Invalid request parameter: ...' } }`) on validation failure.
+### 2. Fast Request & Permission Validation
+Every operation routed through `process()` is validated using zero-dependency native validators:
+- `validateMgRequest`: Verifies `user` (number/string), optional `ips` (string array), valid `operation` string, and payload parameters.
+- `validateAdvancedPermissions`: Validates structured permission definitions (`operation: string`, `value: string[]`).
+- Returns structured error responses (`{ data: null, response: { error: 'Invalid request: ...' } }` or `{ data: null, response: { error: 'Invalid advancedPermissions: ...' } }`) on validation failure before querying MongoDB.
 
 ---
 

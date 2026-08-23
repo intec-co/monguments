@@ -32,11 +32,11 @@ The **Monguments** library implements a comprehensive defense-in-depth architect
   - **Index Protection & Leading Wildcard Restriction**: By default (`regexFullSearch: false`), queries without `^` are anchored with `^` and leading wildcards (`.*`, `.+`) are rejected to prevent unindexed table scans. Setting `regexFullSearch: true` allows partial/substring queries.
   - **ReDoS Protection**: Restricts `$regex` pattern length to a maximum of 150 characters and blocks patterns with dangerous nested quantifiers (e.g., `(a+)+`, `(a*)*`).
 
-### 1.5 Runtime Schema & Payload Sanitization (Zod)
+### 1.5 Runtime Schema & Payload Sanitization (Hybrid Validation)
 - **Risk Mitigated**: Malformed payload attacks, invalid collection schema configurations, and permission structure tampering.
 - **Implementation**:
-  - `mgCollectionsSchema` ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)) enforces strict type and property structure rules during library initialization.
-  - `mgRequestSchema` and `advancedPermissionSchema` sanitize incoming operation requests and permissions prior to query processing.
+  - `mgCollectionsSchema` ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)) enforces strict type and property structure rules with **Zod** during library initialization.
+  - `validateMgRequest` and `validateAdvancedPermissions` ([`lib/request-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/request-validator.ts)) sanitize incoming operation requests and permissions in the execution hot path before query processing.
 
 ---
 
@@ -48,7 +48,8 @@ The automated unit test suite validates security safeguards across multiple test
 - [`test/unit/query-validator-edgecases.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/query-validator-edgecases.unit.test.ts): Prototype pollution evasion, case variations, `Object.create(null)` handling.
 - [`test/unit/regex-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/regex-validation.unit.test.ts): Regular expression length caps, ReDoS patterns, leading wildcard restrictions, and field whitelisting.
 - [`test/unit/security-hardening.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/security-hardening.unit.test.ts): Depth limits, per-collection `maxLimit`, system collections, and ReDoS regex patterns.
-- [`test/unit/zod-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/zod-validation.unit.test.ts): Runtime Zod schema validation for collection configurations, request parameters, and permission strings.
+- [`test/unit/request-validator.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/request-validator.unit.test.ts): High-performance native validation for request payloads and advanced permissions.
+- [`test/unit/zod-validation.unit.test.ts`](file:///Users/cavargasp/projects/monguments/test/unit/zod-validation.unit.test.ts): Runtime Zod schema validation for collection configurations during initialization.
 
 ---
 

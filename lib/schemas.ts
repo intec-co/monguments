@@ -49,20 +49,3 @@ export const mgCollectionPropertiesSchema = z.object({
 });
 
 export const mgCollectionsSchema = z.record(z.string(), mgCollectionPropertiesSchema);
-
-export const advancedPermissionSchema = z.object({
-	operation: z.string(),
-	value: z.array(z.string())
-});
-
-export const advancedPermissionsSchema = z.array(advancedPermissionSchema);
-
-export const mgRequestSchema = z.object({
-	data: z.any(),
-	ips: z.array(z.string()).optional(),
-	operation: z.string().optional(),
-	params: z.any().optional(),
-	query: z.any().optional(),
-	set: z.any().optional(),
-	user: z.union([z.number(), z.string()]).optional()
-});

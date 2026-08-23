@@ -49,7 +49,7 @@ export async function docWrite(mongo: Link, collection: string, request: MgReque
 							if (collProperties.id !== '_id' && rawDoc._id) {
 								delete rawDoc._id;
 							}
-							const doc = structuredClone(rawDoc);
+							const doc = { ...rawDoc };
 							const seq = startSeq + idx;
 							doc[idColl] = seq;
 							if (collProperties.versionField) {

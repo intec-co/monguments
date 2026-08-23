@@ -369,19 +369,21 @@ Check `result.response?.error` or handle thrown `Error` instances in try/catch b
 
 ---
 
-## 8. Zod Runtime Validation & Error Specs
+## 8. Runtime Validation & Error Specs
 
-`monguments` uses **Zod** (`zod`) for strict runtime contract checking:
+`monguments` uses a hybrid validation strategy combining **Zod** (`zod`) for initial configuration validation and high-performance native validation for requests:
 
 ### Initialization Validation (`mgCollectionsSchema`)
-- **When**: Constructor `new Monguments(db, collections)` or `mgConnectDb(...)`.
-- **Behavior**: Throws a synchronous `Error` on invalid `collections` configuration.
+- **When**: Constructor `createMonguments(db, collections)` or `mgConnectDb(...)`.
+- **Engine**: **Zod** (`lib/schemas.ts`).
+- **Behavior**: Throws a synchronous `ZodError` or `Error` on invalid `collections` configuration.
 - **Error Format**: `Error("Invalid collection properties configuration: <zod-error-details>")`.
 
-### Dispatcher Request & Permission Validation (`mgRequestSchema`, `advancedPermissionSchema`)
-- **When**: Call to `monguments.process(collection, request, permission)`.
-- **Behavior**: Validates `request` and `permission` parameters before executing database queries.
-- **Result Output**: Returns `MgResult` with `data: null` and `response.error`:
-  - Request error: `response: { error: 'Invalid request parameter: <zod-error-details>' }`
-  - Permission error: `response: { error: 'Invalid permission parameter: <zod-error-details>' }`
+### Dispatcher Request & Permission Validation (`request-validator.ts`)
+- **When**: Call to `monguments.process(collection, request, permission, advancedPermissions)`.
+- **Engine**: Native zero-dependency validator (`lib/request-validator.ts`).
+- **Behavior**: Validates `request` and `advancedPermissions` parameters before executing database queries.
+- **Result Output**: Returns `MgResult` with `response.error`:
+  - Request error: `response: { error: 'Invalid request: <error-details>' }`
+  - Advanced permissions error: `response: { error: 'Invalid advancedPermissions: <error-details>' }`
 

@@ -46,10 +46,9 @@ When collection properties have `workflow` defined:
 - Supports automatic document closure (`autoClose: true`) upon reaching terminal states.
 - Integrates with version control: creates version snapshots on transition when `versionOnTransition` and `versionable` are enabled.
 
-### 1.6 Runtime Schema & Request Validation (`Zod`)
-Located in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts):
-- Enforces strict runtime validation for collection configurations (`mgCollectionsSchema`) upon `Monguments` instantiation.
-- Validates request payloads (`mgRequestSchema`) and permission strings/objects (`advancedPermissionSchema`) in `docProcess` before any database queries execute.
+### 1.6 Runtime Schema & Request Validation (Hybrid Architecture)
+- **Collection Configuration Validation (`Zod`)**: Located in [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts), enforces strict runtime validation for collection configurations (`mgCollectionsSchema`) upon `Monguments` instantiation.
+- **Fast Request & Permission Validation (Native)**: Located in [`lib/request-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/request-validator.ts), validates request payloads (`MgRequest`) and permission objects (`AdvancedPermission`) in `docProcess` with zero runtime dependencies for maximum throughput.
 - Fails fast with structured error messages to prevent invalid operations or corrupted database states.
 
 ---
@@ -125,6 +124,7 @@ monguments/
 │   ├── operation-transition.ts # State machine workflow transition handler
 │   ├── operation-write.ts      # Write operation implementation
 │   ├── query-validator.ts      # NoSQL injection prevention & query sanitizer
+│   ├── request-validator.ts    # High-performance native request & permission validator
 │   ├── schemas.ts              # Zod runtime validation schemas
 │   ├── tools.ts                # Utility functions
 │   └── types.ts                # TypeScript types, classes, interfaces
