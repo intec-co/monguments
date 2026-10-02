@@ -100,11 +100,12 @@ function normalizeCollections(inputCollections: MgCollections): MgCollections {
 }
 
 export function createMonguments(db: Db, collections: MgCollections, client?: MongoClient): Monguments {
+	const mongoClient = client || (db as any).client;
 	const normalizedCollections = normalizeCollections(collections);
-	const link = createLink(db, normalizedCollections);
+	const link = createLink(db, normalizedCollections, mongoClient);
 
 	return Object.freeze({
-		client,
+		client: mongoClient,
 		db,
 		collectionsProperties: normalizedCollections,
 		async add(collection: string, request: MgRequest): Promise<MgResult> {

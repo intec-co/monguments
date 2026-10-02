@@ -253,6 +253,13 @@ const request: MgRequest = {
 const result: MgResult = await monguments.write('documents', request);
 ```
 
+##### Multi-Tier Transactional & Concurrent Consistency Architecture (`newVersion`)
+For collections with `versionable: true`, `newVersion` implements a 4-tier consistency model:
+- **Tier 1 (ACID Transactions)**: Uses `ClientSession.startTransaction()` on replica sets. Predecessor retirement and successor insertion commit atomically.
+- **Tier 2 (Optimistic Concurrency Control / CAS)**: Atomic filter on `{ _id: prevId, _isLast: true }` setting `_isLast: false`. Throws `ConcurrentModificationError` if `matchedCount === 0`.
+- **Tier 3 (Compensating Rollback)**: On standalone instances, restores `_isLast: true` on predecessor if `insertOne` fails.
+- **Tier 4 (Jittered Retry Loop)**: Automatically retries up to 10 attempts with randomized backoff (`10ms * attempt + random(20ms)`), detecting in-flight transitions.
+
 #### 3. Set (`monguments.set`)
 Partial update of allowed fields (`set` array in schema).
 ```typescript

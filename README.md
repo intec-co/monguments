@@ -42,7 +42,7 @@ A high-level TypeScript document management library for MongoDB providing built-
 ## Features
 
 - 🔄 **Document Workflows & State Machines**: Define valid state transitions, required transition fields, role-based transition security, and automatic closure on terminal states (`transition`).
-- 🕒 **Document Versioning**: Preserve full history of document updates with automatic version management (`_isLast: true/false`).
+- 🕒 **Document Versioning & Multi-Tier Concurrency**: Preserve full history of document updates with automatic version management (`_isLast: true/false`), multi-tier ACID transaction sessions, atomic Compare-And-Swap (CAS), compensating rollback, and jittered retry loops.
 - 🔍 **Traceability & Audit Trail**: Automatically record writing user ID, timestamps, and client IP addresses (`_w`).
 - 🔐 **Fine-Grained Permissions**: 2-character permission system controlling user ownership access (`r`/`R` read, `w`/`W`/`c`/`C` write/create).
 - 🔒 **Document Closure**: Lock documents (`_closed: true`) to prevent unauthorized modifications while optionally allowing specific field updates (`addClosed`, `setClosed`).
@@ -321,6 +321,28 @@ const request: MgRequest = {
 
 const result = await monguments.write('articles', request);
 ```
+
+#### Multi-Tier Transactional & Concurrent Consistency Architecture
+
+For `versionable: true` collections, `newVersion` implements a multi-tier transactional and concurrent consistency architecture:
+
+1. **Tier 1: Multi-Document ACID Transactions (`ClientSession`)**:
+   - When connected to MongoDB replica sets or sharded clusters, versioning executes inside an atomic `ClientSession` transaction.
+   - Retiring predecessor active flags (`_isLast: false`) and inserting new active documents (`_isLast: true`) succeed or abort together atomically.
+   - If standalone topology is detected (transactions unsupported), it seamlessly falls back to Tier 2.
+
+2. **Tier 2: Optimistic Concurrency Control (Atomic CAS)**:
+   - Atomic Compare-And-Swap on `{ _id: prev_id, _isLast: true }` updating to `{ _isLast: false }`.
+   - If `matchedCount === 0`, detects concurrent modification collision and raises `ConcurrentModificationError`.
+
+3. **Tier 3: Compensating Rollback**:
+   - In standalone mode without transactions, if successor `insertOne` fails after predecessor retirement, immediately executes a compensating rollback restoring `_isLast: true` on the predecessor document.
+   - Prevents entities from becoming orphaned or invisible to active queries.
+
+4. **Tier 4: Jittered Exponential Backoff Retry Loop**:
+   - Retries up to 10 attempts on concurrency collision or during in-flight version transitions.
+   - Uses exponential backoff with randomized jitter (`10ms * attempt + random(20ms)`) to prevent thundering herd.
+   - Re-reads latest active document and dynamically re-evaluates write mode (`updateVersion` vs `newVersion`).
 
 ---
 
