@@ -376,6 +376,13 @@ export interface MgLink {
 - **`asArray`**: If `true`, returns an array of matched records instead of unwinding to a single object.
 - **`query`**: Optional custom JSON query template mapping the foreign field. For example, `query: "{\"id\":from}"` dynamically binds the local `from` field value to the foreign collection's `id` field, rather than defaulting to the collection's consecutive key `idColl`. Supports both `"from"` and `from` identifiers as value placeholders.
 
+#### Security Invariants for Owned Links
+When a linked collection defines an `owner` property:
+1. **Root Collection Owner Requirement**: The root/parent collection must have an `owner` configured. If the root collection has no owner, the link is not processed.
+2. **From Field Owner Matching**: The link's `from` property must strictly match the root collection's `owner` (`singleLink.from === rootConf.owner`).
+3. **Foreign Field Owner Matching**: The resolved foreign query field must match the linked collection's `owner` (`targetForeignField === linkedConf.owner`).
+4. **Unowned Linked Collections**: If the linked collection does not configure an `owner` (e.g., public catalogs, system lookup tables), these owner-matching constraints do not apply.
+
 ---
 
 ## 7. Result Pattern & Error Handling

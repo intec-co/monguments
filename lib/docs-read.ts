@@ -38,12 +38,23 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 			const collectionLink = singleLink.collection;
 			const collectionLinkConf = mongo.getCollectionProperties(collectionLink);
 			if (collectionLinkConf) {
+				if (collectionLinkConf.owner) {
+					if (!collectionConf.owner) {
+						console.error(`The collection ${collection} hasn't owner for link to ${collectionLink}`);
+						continue;
+					}
+					if (singleLink.from !== collectionConf.owner) {
+						console.error(`The link from '${singleLink.from}' doesn't match root collection ${collection} owner '${collectionConf.owner}'`);
+						continue;
+					}
+				}
+
 				const idColl = collectionLinkConf.id || '_id';
 				const isVersionable = collectionLinkConf.versionable;
 				const isLast = isVersionable ? collectionLinkConf.properties?.isLast : undefined;
 				const projection = getProjection(collectionLinkConf, collectionLink);
 
-				let targetForeignField: string = idColl;
+				let targetForeignField: string = collectionLinkConf.owner || idColl;
 				const extraConditions: Record<string, any> = {};
 				if (singleLink.query) {
 					const qStr = singleLink.query
@@ -62,6 +73,11 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 						console.error('catch in parse link query');
 						continue;
 					}
+				}
+
+				if (collectionLinkConf.owner && targetForeignField !== collectionLinkConf.owner) {
+					console.error(`The target query field '${targetForeignField}' doesn't match linked collection ${collectionLink} owner '${collectionLinkConf.owner}'`);
+					continue;
 				}
 
 				if (isVersionable) {

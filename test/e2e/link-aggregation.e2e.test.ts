@@ -28,7 +28,6 @@ describe('Link Aggregation & Projections E2E', () => {
 			linkedColl: {
 				versionable: false,
 				id: 'authId',
-				owner: 'user1',
 				link: {},
 				properties: {
 					isLast: '_isLast',
@@ -42,7 +41,6 @@ describe('Link Aggregation & Projections E2E', () => {
 				versionable: true,
 				versionTime: 0,
 				id: 'defaultKey',
-				owner: 'user1',
 				link: {},
 				properties: {
 					isLast: '_isLast',

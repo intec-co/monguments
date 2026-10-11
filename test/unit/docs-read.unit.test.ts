@@ -577,5 +577,120 @@ describe('DocsRead', () => {
 			expect(consoleSpy).toHaveBeenCalledWith('catch in parse link query');
 			consoleSpy.mockRestore();
 		});
+
+		it('should skip link when linked collection has owner but root collection has no owner', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { link: { linkedColl: true } }; // No owner
+				if (collName === 'linkedColl') return { id: 'linkedId', owner: 'ownerField', versionable: false, properties: {} };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+			mockReq.params = {
+				link: [{
+					collection: 'linkedColl',
+					from: 'ownerField',
+					to: 'linkedData'
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'R--');
+
+			expect(mockReq.params?.lookup).toBeUndefined();
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('hasn\'t owner for link to linkedColl'));
+			consoleSpy.mockRestore();
+		});
+
+		it('should skip link when linked collection has owner but link.from does not match root collection owner', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'rootOwner', link: { linkedColl: true } };
+				if (collName === 'linkedColl') return { id: 'linkedId', owner: 'ownerField', versionable: false, properties: {} };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+			mockReq.params = {
+				link: [{
+					collection: 'linkedColl',
+					from: 'wrongField', // does not match rootOwner
+					to: 'linkedData'
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params?.lookup).toBeUndefined();
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('doesn\'t match root collection testColl owner \'rootOwner\''));
+			consoleSpy.mockRestore();
+		});
+
+		it('should skip link when linked collection has owner but target query field does not match linked collection owner', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'rootOwner', link: { linkedColl: true } };
+				if (collName === 'linkedColl') return { id: 'linkedId', owner: 'ownerField', versionable: false, properties: {} };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+			mockReq.params = {
+				link: [{
+					collection: 'linkedColl',
+					from: 'rootOwner',
+					to: 'linkedData',
+					query: '{"otherField":from}' // otherField != ownerField
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params?.lookup).toBeUndefined();
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('doesn\'t match linked collection linkedColl owner \'ownerField\''));
+			consoleSpy.mockRestore();
+		});
+
+		it('should successfully process link when linked collection has owner and all owner validations match', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'id', link: { paperwork: true } };
+				if (collName === 'paperwork') return { id: 'pw', owner: 'id', versionable: true, properties: { isLast: 'isLast' } };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				link: [{
+					collection: 'paperwork',
+					from: 'id',
+					to: 'paperwork',
+					asArray: true,
+					query: '{"id":from}'
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 79268 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params?.lookup).toBeDefined();
+			expect(Array.isArray(mockReq.params!.lookup)).toBe(true);
+			const lookupStage = (mockReq.params!.lookup as any)[0].$lookup;
+			expect(lookupStage.from).toBe('paperwork');
+			expect(lookupStage.as).toBe('paperwork');
+		});
 	});
 });
