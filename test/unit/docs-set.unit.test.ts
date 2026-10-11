@@ -103,6 +103,25 @@ describe('DocsSet', () => {
 			expect(result).toEqual({ data: undefined, response: { error: 'No tiene permisos para esta operación' } });
 		});
 
+		it('should automatically inject owner field into query when write permission is lowercase w and owner is not provided', async () => {
+			const req: any = { user: 'user1', data: { query: { id: 1 } } };
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'ownerField', versionable: false });
+			const toArrayMock = vi.fn().mockResolvedValue([{ _id: 1 }]);
+			mockCollection.find.mockReturnValue({ toArray: toArrayMock });
+
+			await docSet(mockMongo, 'test', req, 'Rw');
+			expect(req.data.query.ownerField).toBe('user1');
+			expect(setModule.set).toHaveBeenCalledTimes(1);
+		});
+
+		it('should return error when permission is lowercase w but collection has no owner configured', async () => {
+			const req: any = { user: 'user1', data: { query: { id: 1 } } };
+			mockMongo.getCollectionProperties.mockReturnValue({ versionable: false });
+
+			const result = await docSet(mockMongo, 'test', req, 'Rw');
+			expect(result).toEqual({ data: undefined, response: { error: 'No tiene permisos para esta operación' } });
+		});
+
 		it('should delegate to set for versionable collections', async () => {
 			const req: any = { data: { query: { id: 1 } } };
 			mockMongo.getCollectionProperties.mockReturnValue({

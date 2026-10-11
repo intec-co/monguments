@@ -185,6 +185,33 @@ describe('DocProcess Unit', () => {
 			expect(res).toEqual({ data: 5 });
 		});
 
+		it('should automatically inject owner field into req.data for count when permission is lowercase r and owner is not provided', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({
+				owner: 'ownerId',
+				versionable: false
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+			mockCollection.countDocuments.mockResolvedValue(3);
+
+			const req = { user: 'user1', data: { category: 'A' }, operation: 'count' };
+			const res = await docProcess(mockLink, 'test', req, 'r--');
+
+			expect((req.data as any).ownerId).toBe('user1');
+			expect(mockCollection.countDocuments).toHaveBeenCalledWith({ category: 'A', ownerId: 'user1' });
+			expect(res).toEqual({ data: 3 });
+		});
+
+		it('should return error for count when permission is lowercase r but collection has no owner configured', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({
+				versionable: false
+			});
+
+			const req = { user: 'user1', data: {}, operation: 'count' };
+			const res = await docProcess(mockLink, 'test', req, 'r--');
+
+			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
+
 		it('should return 0 when countDocuments resolves to 0 or null', async () => {
 			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId', versionable: false });
 			(hasPermission as Mock).mockReturnValue(true);

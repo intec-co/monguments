@@ -49,6 +49,44 @@ describe('DocsRead', () => {
 			expect(result).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
 		});
 
+		it('should automatically inject owner field into req.data when permission is lowercase r and owner is not provided', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'userField' });
+			(hasPermission as Mock).mockImplementation((perm, owner, req) => req.data?.[owner] === req.user);
+
+			mockReq.user = 42;
+			mockReq.data = { someProp: 'test' };
+
+			const mockDoc = { id: 1, userField: 42 };
+			(read as Mock).mockReturnValue({ next: vi.fn().mockResolvedValue(mockDoc) });
+
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.data.userField).toBe(42);
+			expect(result).toEqual({ data: mockDoc });
+		});
+
+		it('should return error when permission is lowercase r but collection has no owner configured', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({});
+
+			const result = await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(result).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
+
+		it('should not inject owner field when permission is uppercase R (global read)', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'userField' });
+			(hasPermission as Mock).mockReturnValue(true);
+
+			mockReq.user = 42;
+			mockReq.data = {};
+
+			(read as Mock).mockReturnValue({ next: vi.fn().mockResolvedValue({ id: 1 }) });
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'R--');
+
+			expect(mockReq.data.userField).toBeUndefined();
+		});
+
 		it('should return error response when database query fails', async () => {
 			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
 			(hasPermission as Mock).mockReturnValue(true);
@@ -341,6 +379,30 @@ describe('DocsRead', () => {
 		it('should return error response when user lacks permissions', async () => {
 			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'user1' });
 			(hasPermission as Mock).mockReturnValue(false);
+
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(result).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
+
+		it('should automatically inject owner field into req.data when permission is lowercase r in readList', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({ owner: 'userField', projects: [] });
+			(hasPermission as Mock).mockImplementation((perm, owner, req) => req.data?.[owner] === req.user);
+
+			mockReq.user = 42;
+			mockReq.data = {};
+
+			const mockArray = [{ id: 1, userField: 42 }];
+			(read as Mock).mockReturnValue({ toArray: vi.fn().mockResolvedValue(mockArray) });
+
+			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.data.userField).toBe(42);
+			expect(result).toEqual({ data: mockArray });
+		});
+
+		it('should return error when permission is lowercase r but collection has no owner configured in readList', async () => {
+			mockMongo.getCollectionProperties.mockReturnValue({});
 
 			const result = await readList(mockMongo as any, 'testColl', mockReq, 'r--');
 

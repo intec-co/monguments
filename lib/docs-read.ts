@@ -44,15 +44,19 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 				const projection = getProjection(collectionLinkConf, collectionLink);
 
 				let targetForeignField: string = idColl;
+				const extraConditions: Record<string, any> = {};
 				if (singleLink.query) {
 					const qStr = singleLink.query
-						.replace(/:\s*"from"/g, ':"$$fromVal"')
-						.replace(/:\s*from\b/g, ':"$$fromVal"');
+						.replace(/:\s*"from"/g, ':"__FROM_VAL__"')
+						.replace(/:\s*from\b/g, ':"__FROM_VAL__"');
 					try {
 						const raw = JSON.parse(qStr);
-						const keys = Object.keys(raw);
-						if (keys.length === 1 && raw[keys[0]] === '$$fromVal') {
-							targetForeignField = keys[0];
+						for (const [k, v] of Object.entries(raw)) {
+							if (v === '__FROM_VAL__' || v === '$$fromVal' || v === '$fromVal') {
+								targetForeignField = k;
+							} else {
+								extraConditions[k] = v;
+							}
 						}
 					} catch (e) {
 						console.error('catch in parse link query');
@@ -65,7 +69,8 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 						{
 							$match: {
 								$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
-								...(isLast ? { [isLast]: true } : {})
+								...(isLast ? { [isLast]: true } : {}),
+								...extraConditions
 							}
 						}
 					];
@@ -88,14 +93,43 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 						}
 					});
 				} else {
-					lookupStages.push({
-						$lookup: {
-							from: collectionLink,
-							localField: singleLink.from,
-							foreignField: targetForeignField,
-							as: singleLink.to
+					if (Object.keys(extraConditions).length > 0) {
+						const pipeline: any[] = [
+							{
+								$match: {
+									$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
+									...extraConditions
+								}
+							}
+						];
+						if (!singleLink.asArray) {
+							pipeline.push({ $limit: 1 });
 						}
-					});
+						if (projection) {
+							const projCopy = { ...projection };
+							if (collectionLinkConf.id !== '_id' && projCopy._id === undefined) {
+								projCopy._id = 0;
+							}
+							pipeline.push({ $project: projCopy });
+						}
+						lookupStages.push({
+							$lookup: {
+								from: collectionLink,
+								let: { fromVal: `$${singleLink.from}` },
+								pipeline,
+								as: singleLink.to
+							}
+						});
+					} else {
+						lookupStages.push({
+							$lookup: {
+								from: collectionLink,
+								localField: singleLink.from,
+								foreignField: targetForeignField,
+								as: singleLink.to
+							}
+						});
+					}
 				}
 
 				if (!singleLink.asArray) {
@@ -133,6 +167,17 @@ function checkRequest(
 		return 'Colección no configurada';
 	}
 	const owner = collectionConf.owner;
+	if (permission === 'r') {
+		if (!owner) {
+			return 'No tiene permisos para esta operación';
+		}
+		if (!req.data) {
+			req.data = {};
+		}
+		if (req.data[owner] === undefined) {
+			req.data[owner] = req.user;
+		}
+	}
 	if (!hasPermission(permission, owner, req)) {
 		return 'No tiene permisos para esta operación';
 	}

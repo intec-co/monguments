@@ -82,6 +82,15 @@ export const docProcess = async (
 			permission = permissions.charAt(0);
 			const conf = link.getCollectionProperties(collection);
 			if (conf) {
+				if (permission === 'r') {
+					if (!conf.owner) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+					if (!request.data) {
+						request.data = {};
+					}
+					request.data[conf.owner] = request.user;
+				}
 				if (hasPermission(permission, conf.owner, request)) {
 					if (conf.versionable && !request.data[conf.properties.isLast]) {
 						request.data[conf.properties.isLast] = true;

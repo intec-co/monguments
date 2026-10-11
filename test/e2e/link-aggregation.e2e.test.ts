@@ -14,7 +14,8 @@ describe('Link Aggregation & Projections E2E', () => {
 				id: 'id',
 				owner: 'user1',
 				link: {
-					linkedColl: true
+					linkedColl: true,
+					versionedColl: true
 				},
 				properties: {
 					isLast: '_isLast',
@@ -27,6 +28,20 @@ describe('Link Aggregation & Projections E2E', () => {
 			linkedColl: {
 				versionable: false,
 				id: 'authId',
+				owner: 'user1',
+				link: {},
+				properties: {
+					isLast: '_isLast',
+					w: '_w',
+					closed: '_closed',
+					history: '_h_*',
+					date: '_date'
+				}
+			},
+			versionedColl: {
+				versionable: true,
+				versionTime: 0,
+				id: 'defaultKey',
 				owner: 'user1',
 				link: {},
 				properties: {
@@ -68,6 +83,12 @@ describe('Link Aggregation & Projections E2E', () => {
 		await mg.getCollection('linkedColl').insertMany([
 			{ authId: 'auth_100', name: 'Author One', bio: 'Bio 1' },
 			{ authId: 'auth_200', name: 'Author Two', bio: 'Bio 2' }
+		]);
+
+		await mg.getCollection('versionedColl').insertMany([
+			{ defaultKey: 'def_1', customField: 1, name: 'Doc V1 Active', _isLast: true, status: 'active' },
+			{ defaultKey: 'def_2', customField: 1, name: 'Doc V2 Old', _isLast: false, status: 'active' },
+			{ defaultKey: 'def_3', customField: 1, name: 'Doc V3 Inactive', _isLast: true, status: 'inactive' }
 		]);
 
 		await mg.getCollection('readProjection').insertMany([
@@ -137,6 +158,60 @@ describe('Link Aggregation & Projections E2E', () => {
 			expect(Array.isArray(dataList[0].authors)).toBe(true);
 			expect(dataList[0].authors[0].name).toBe('Author One');
 			expect(dataList[1].authors[0].name).toBe('Author Two');
+		});
+
+		it('should override foreign key using singleLink.query {"customField": from} instead of default id', async () => {
+			const req: MgRequest = {
+				data: { id: 1 },
+				operation: 'read',
+				user: 0,
+				params: {
+					link: [
+						{
+							collection: 'versionedColl',
+							from: 'id',
+							to: 'versionedItem',
+							query: '{"customField":from}'
+						}
+					]
+				}
+			};
+
+			const res = await mg.process('mainColl', req, 'RW_');
+			const data = res.data;
+
+			expect(data).toBeDefined();
+			expect(data.versionedItem).toBeDefined();
+			expect(data.versionedItem.customField).toBe(1);
+			expect(data.versionedItem.name).toBe('Doc V1 Active');
+			expect(data.versionedItem._isLast).toBe(true);
+		});
+
+		it('should support extra query filter attributes in singleLink.query', async () => {
+			const req: MgRequest = {
+				data: { id: 1 },
+				operation: 'read',
+				user: 0,
+				params: {
+					link: [
+						{
+							collection: 'versionedColl',
+							from: 'id',
+							to: 'versionedItem',
+							query: '{"customField":from, "status": "inactive"}'
+						}
+					]
+				}
+			};
+
+			const res = await mg.process('mainColl', req, 'RW_');
+			const data = res.data;
+
+			expect(data).toBeDefined();
+			expect(data.versionedItem).toBeDefined();
+			expect(data.versionedItem.customField).toBe(1);
+			expect(data.versionedItem.status).toBe('inactive');
+			expect(data.versionedItem.name).toBe('Doc V3 Inactive');
 		});
 	});
 

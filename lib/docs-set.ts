@@ -8,7 +8,15 @@ async function setOne(mongo: Link, request: MgRequest, permission: string, colle
 		if (permission === 'w' || permission === 's') {
 			if (collProperties) {
 				const owner = collProperties.owner;
-				if (!owner || request.data.query[owner] !== request.user) {
+				if (!owner) {
+					return {
+						data: undefined,
+						response: { error: 'No tiene permisos para esta operación' }
+					};
+				}
+				if (request.data.query[owner] === undefined) {
+					request.data.query[owner] = request.user;
+				} else if (request.data.query[owner] !== request.user) {
 					return {
 						data: undefined,
 						response: { error: 'No tiene permisos para esta operación' }

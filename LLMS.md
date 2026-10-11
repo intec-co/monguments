@@ -173,6 +173,13 @@ Permissions strings are strictly **2 characters**: `"<ReadScope><WriteScope>"`
 - **Read Scope**: `'r'` = matching `doc[owner] === request.user`; `'R'` = all documents in collection.
 - **Write Scope**: `'w'` = write own only; `'W'` = write any; `'c'` = create own only; `'C'` = create any.
 
+#### Automatic Owner Injection
+When a collection configures an `owner` property:
+1. **Owner-Scoped Read (`'r'`)**: On `read`, `readList`, and `count`, if the request omits the owner field in `req.data`, Monguments automatically injects `req.data[conf.owner] = req.user`.
+2. **Owner-Scoped Write/Set (`'w'` / `'s'`)**: On `set`, if `request.data.query` omits the owner field, it automatically injects `query[conf.owner] = request.user`. If provided but mismatched with `request.user`, it returns `'No tiene permisos para esta operación'`.
+3. **Missing Owner Config**: If an operation is invoked with an owner-scoped permission (`'r'`, `'w'`, `'s'`) but the collection does not have `owner` configured, the operation is rejected immediately with `'No tiene permisos para esta operación'`.
+4. **Global Scope (`'R'`, `'W'`)**: Admin permissions bypass owner injection and match across all documents.
+
 ---
 
 ## 5. Operation Requests & Methods
@@ -229,7 +236,16 @@ const request: MgRequestRead = {
       localField: 'userId',
       foreignField: '_id',
       as: 'author'
-    }
+    },
+    link: [
+      {
+        collection: 'userProfile',
+        from: 'userId',
+        to: 'profile',
+        query: '{"uid":from, "active":true}', // Relational mapping: maps 'from' to foreign 'uid' attribute with extra filters
+        asArray: false
+      }
+    ]
   }
 };
 
@@ -354,6 +370,11 @@ export interface MgLink {
   asArray?: boolean;
 }
 ```
+
+- **`from`**: Local field in current document whose value is extracted.
+- **`to`**: Target field name where linked document(s) will be attached.
+- **`asArray`**: If `true`, returns an array of matched records instead of unwinding to a single object.
+- **`query`**: Optional custom JSON query template mapping the foreign field. For example, `query: "{\"id\":from}"` dynamically binds the local `from` field value to the foreign collection's `id` field, rather than defaulting to the collection's consecutive key `idColl`. Supports both `"from"` and `from` identifiers as value placeholders.
 
 ---
 

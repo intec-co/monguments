@@ -488,7 +488,8 @@ const request: MgRequestRead = {
       {
         collection: 'categories',
         from: 'categoryId',
-        to: '_id',
+        to: 'category',
+        query: '{"id":from}', // Override foreign key matching: maps 'from' to foreign 'id'
         asArray: false
       }
     ]
