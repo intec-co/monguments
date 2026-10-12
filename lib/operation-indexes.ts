@@ -117,35 +117,37 @@ export async function ensureIndexes(
 		targetList = Object.entries(collections);
 	}
 
-	for (const [collName, conf] of targetList) {
-		const models = buildCollectionIndexModels(conf);
-		if (models.length === 0) {
-			results[collName] = [];
-			continue;
-		}
-
-		const coll = db.collection(collName);
-		try {
-			const createdNames = await coll.createIndexes(models);
-			results[collName] = createdNames;
-		} catch (batchErr: unknown) {
-			const createdNames: string[] = [];
-			if (typeof coll.createIndex === 'function') {
-				for (const model of models) {
-					try {
-						const { key, ...opts } = model;
-						const idxName = await coll.createIndex(key, opts);
-						createdNames.push(idxName);
-					} catch (singleErr: unknown) {
-						onIndexError?.(collName, model.name || JSON.stringify(model.key), singleErr);
-					}
-				}
-			} else {
-				onIndexError?.(collName, 'batch', batchErr);
+	await Promise.all(
+		targetList.map(async ([collName, conf]) => {
+			const models = buildCollectionIndexModels(conf);
+			if (models.length === 0) {
+				results[collName] = [];
+				return;
 			}
-			results[collName] = createdNames;
-		}
-	}
+
+			const coll = db.collection(collName);
+			try {
+				const createdNames = await coll.createIndexes(models);
+				results[collName] = createdNames;
+			} catch (batchErr: unknown) {
+				const createdNames: string[] = [];
+				if (typeof coll.createIndex === 'function') {
+					for (const model of models) {
+						try {
+							const { key, ...opts } = model;
+							const idxName = await coll.createIndex(key, opts);
+							createdNames.push(idxName);
+						} catch (singleErr: unknown) {
+							onIndexError?.(collName, model.name || JSON.stringify(model.key), singleErr);
+						}
+					}
+				} else {
+					onIndexError?.(collName, 'batch', batchErr);
+				}
+				results[collName] = createdNames;
+			}
+		})
+	);
 
 	return results;
 }
