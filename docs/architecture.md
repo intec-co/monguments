@@ -51,14 +51,19 @@ When collection properties have `workflow` defined:
 - **Fast Request & Permission Validation (Native)**: Located in [`lib/request-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/request-validator.ts), validates request payloads (`MgRequest`) and permission objects (`AdvancedPermission`) in `docProcess` with zero runtime dependencies for maximum throughput.
 - Fails fast with structured error messages to prevent invalid operations or corrupted database states.
 
+### 1.7 Decoupled Logger Injection (`MgLogger`)
+- Located in [`lib/logger.ts`](file:///Users/cavargasp/projects/monguments/lib/logger.ts), allows host applications to inject an optional `MgLogger` (callback function or `{ log, debug, info, warn, error }` object) via `mgConnectDb`, `new Monguments`, or `monguments.setLogger()`.
+- Captures native MongoDB driver errors (`err` with stacktrace), NoSQL injection security rejections, permission denials, concurrency retries, Tier 3 compensating rollbacks, and index creation summaries (`MgLogEntry`).
+- Isolates logger execution inside `try/catch` so host logging failures never interrupt persistence operations.
+
 ---
 
 ## 2. Main API Components
 
 ### 2.1 Interface Entry Point (`Monguments`)
 Located in [`lib/monguments.ts`](file:///Users/cavargasp/projects/monguments/lib/monguments.ts):
-- Initialized with a MongoDB `Db` instance and an `MgCollections` configuration dictionary.
-- Provides operations: `process()`, `read()`, `write()`, `add()`, `set()`, `close()`, `transition()`, `count()`, `getCounter()`, `getCollection()`.
+- Initialized with a MongoDB `Db` instance, an `MgCollections` configuration dictionary, and an optional `MgLogger`.
+- Provides operations: `process()`, `read()`, `write()`, `add()`, `set()`, `close()`, `transition()`, `count()`, `getCounter()`, `getCollection()`, `ensureIndexes()`, `setLogger()`.
 - Supports optional `advancedPermissions` in `process()` and `transition()` for field projections (`read`/`readList`) and workflow action validation (`transition`).
 
 ### 2.2 Collections Configuration (`MgCollectionProperties`)
@@ -116,6 +121,7 @@ monguments/
 │   ├── docs-write.ts           # High-level write handler
 │   ├── has-permission.ts       # Permission validation logic
 │   ├── index.ts                # Exported library entry point
+│   ├── logger.ts               # Decoupled logger adapter and dispatch helpers
 │   ├── monguments.ts           # Core Monguments class
 │   ├── operation-add.ts        # Add operation implementation
 │   ├── operation-close.ts      # Close operation implementation

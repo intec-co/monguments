@@ -2,6 +2,7 @@ import { Collection } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult } from './types';
 import { validateDocumentData } from './query-validator';
+import { logFromLink } from './logger';
 
 async function writeAdd(
 	coll: Collection,
@@ -9,7 +10,9 @@ async function writeAdd(
 	request: MgRequest,
 	opened: boolean,
 	toClosed: boolean,
-	customQuery?: any
+	customQuery?: any,
+	mongo?: Link,
+	collectionName?: string
 ): Promise<MgResult> {
 	const update: any = {};
 	const push: any = {};
@@ -74,6 +77,14 @@ async function writeAdd(
 			}
 			return { response: { msg: 'información guardada' } };
 		} catch (err) {
+			logFromLink(mongo, {
+				level: 'error',
+				collection: collectionName || coll.collectionName,
+				operation: 'add',
+				user: request.user,
+				message: 'ha ocurrido un error (error mongo.add document)',
+				err
+			});
 			return { response: { error: 'ha ocurrido un error', msg: 'error mongo.add document' } };
 		}
 	} else {
@@ -102,7 +113,7 @@ export async function add(mongo: Link, collection: string, request: MgRequest): 
 					openQuery[p.date] = { $gte: minDate };
 				}
 
-				const res = await writeAdd(coll, conf, request, true, false, openQuery);
+				const res = await writeAdd(coll, conf, request, true, false, openQuery, mongo, collection);
 				if (res.data !== undefined || (res.response && res.response.msg)) {
 					return res;
 				}
@@ -127,12 +138,20 @@ export async function add(mongo: Link, collection: string, request: MgRequest): 
 						opened = true;
 					}
 				}
-				return writeAdd(coll, conf, request, opened, toClosed);
+				return writeAdd(coll, conf, request, opened, toClosed, undefined, mongo, collection);
 			} catch (err) {
+				logFromLink(mongo, {
+					level: 'error',
+					collection,
+					operation: 'add',
+					user: request.user,
+					message: 'error en mongo.set',
+					err
+				});
 				return { response: { error: 'error en mongo.set' } };
 			}
 		} else {
-			return writeAdd(coll, conf, request, true, false);
+			return writeAdd(coll, conf, request, true, false, undefined, mongo, collection);
 		}
 	}
 	return { response: { error: 'Colección no configurada' } };

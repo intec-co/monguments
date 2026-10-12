@@ -2,6 +2,7 @@ import { Collection, Db, MongoClient } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult, MgW } from './types';
 import { validateDocumentData } from './query-validator';
+import { logFromLink } from './logger';
 
 export class ConcurrentModificationError extends Error {
 	constructor(message: string) {
@@ -85,7 +86,9 @@ async function updateVersion(
 	conf: MgCollectionProperties,
 	query: any,
 	data: any,
-	doc: any
+	doc: any,
+	mongo?: Link,
+	user?: number
 ): Promise<MgResult> {
 	const p = conf.properties;
 	for (const val of Object.getOwnPropertyNames(data)) {
@@ -116,6 +119,14 @@ async function updateVersion(
 		}
 		return { data: 0 };
 	} catch (err) {
+		logFromLink(mongo, {
+			level: 'error',
+			collection: coll.collectionName,
+			operation: 'write',
+			user,
+			message: 'ha ocurrido un error (operations update)',
+			err
+		});
 		return { response: { error: 'ha ocurrido un error', msg: 'operations update' } };
 	}
 }
@@ -128,7 +139,9 @@ export async function executeNewVersion(
 	query: any,
 	data: any,
 	existingDoc: any,
-	now: number = new Date().getTime()
+	now: number = new Date().getTime(),
+	mongo?: Link,
+	user?: number
 ): Promise<MgResult> {
 	const p = conf.properties;
 	const idColl = conf.id || '_id';
@@ -276,6 +289,14 @@ export async function executeNewVersion(
 			await coll.insertOne(historicalDoc);
 		} catch (insertErr) {
 			// Tier 3: Compensating Rollback
+			logFromLink(mongo, {
+				level: 'warn',
+				collection,
+				operation: 'write',
+				user,
+				message: 'Executing compensating rollback to restore active version after insert failure',
+				err: insertErr
+			});
 			await coll.replaceOne({ _id: existingOid }, existingDoc).catch(() => {});
 			throw insertErr;
 		}
@@ -301,6 +322,14 @@ export async function executeNewVersion(
 			return { data, response: { msg: 'datos versionados' } };
 		} catch (insertErr) {
 			// Tier 3: Compensating Rollback
+			logFromLink(mongo, {
+				level: 'warn',
+				collection,
+				operation: 'write',
+				user,
+				message: 'Executing compensating rollback to restore _isLast: true after insert failure',
+				err: insertErr
+			});
 			const restoreFilter: any = existingOid !== undefined
 				? { _id: existingOid }
 				: { [idColl]: existingBusinessId };
@@ -329,7 +358,14 @@ export async function newVersion(
 	);
 }
 
-async function newDoc(db: Db, collection: string, conf: MgCollectionProperties, data: any): Promise<MgResult> {
+async function newDoc(
+	db: Db,
+	collection: string,
+	conf: MgCollectionProperties,
+	data: any,
+	mongo?: Link,
+	user?: number
+): Promise<MgResult> {
 	const p = conf.properties;
 	const idColl = conf.id || '_id';
 	const coll = db.collection(collection);
@@ -351,6 +387,14 @@ async function newDoc(db: Db, collection: string, conf: MgCollectionProperties, 
 			obj[idColl] = seq;
 			return { data: obj, response: { msg: 'Los datos fueron guardados' } };
 		} catch (err) {
+			logFromLink(mongo, {
+				level: 'error',
+				collection,
+				operation: 'write',
+				user,
+				message: 'errInsert',
+				err
+			});
 			return { response: { error: 'errInsert' } };
 		}
 	} else if (data[idColl]) {
@@ -361,6 +405,14 @@ async function newDoc(db: Db, collection: string, conf: MgCollectionProperties, 
 			const result = await coll.insertOne(data);
 			return { data: result };
 		} catch (error) {
+			logFromLink(mongo, {
+				level: 'error',
+				collection,
+				operation: 'write',
+				user,
+				message: 'ha ocurrido un error (insertOne)',
+				err: error
+			});
 			return { response: { error: 'ha ocurrido un error' } };
 		}
 	} else {
@@ -368,7 +420,14 @@ async function newDoc(db: Db, collection: string, conf: MgCollectionProperties, 
 	}
 }
 
-async function overwrite(coll: Collection, conf: MgCollectionProperties, query: any, data: any): Promise<MgResult> {
+async function overwrite(
+	coll: Collection,
+	conf: MgCollectionProperties,
+	query: any,
+	data: any,
+	mongo?: Link,
+	user?: number
+): Promise<MgResult> {
 	for (const val of Object.getOwnPropertyNames(data)) {
 		if (val.indexOf('$') >= 0) {
 			return { response: { error: `${val} property isn't permitted` } };
@@ -382,11 +441,26 @@ async function overwrite(coll: Collection, conf: MgCollectionProperties, query: 
 			return { data: 0, response: { msg: 'Los datos fueron guardados' } };
 		}
 	} catch (err) {
+		logFromLink(mongo, {
+			level: 'error',
+			collection: coll.collectionName,
+			operation: 'write',
+			user,
+			message: 'ha ocurrido un error (operations overwrite)',
+			err
+		});
 		return { response: { error: 'ha ocurrido un error', msg: 'operations overwrite' } };
 	}
 }
 
-async function closeDoc(coll: Collection, conf: MgCollectionProperties, query: any, w: MgW): Promise<MgResult> {
+async function closeDoc(
+	coll: Collection,
+	conf: MgCollectionProperties,
+	query: any,
+	w: MgW,
+	mongo?: Link,
+	user?: number
+): Promise<MgResult> {
 	const p = conf.properties;
 	const set: any = { _wClose: w };
 	set[p.closed] = true;
@@ -394,6 +468,14 @@ async function closeDoc(coll: Collection, conf: MgCollectionProperties, query: a
 		await coll.updateOne(query, { $set: set }, { upsert: false });
 		return { response: { msg: 'documento cerrado por tiempo' } };
 	} catch (err) {
+		logFromLink(mongo, {
+			level: 'error',
+			collection: coll.collectionName,
+			operation: 'write',
+			user,
+			message: 'ha ocurrido un error (error al cerrar automaticamente el documetno)',
+			err
+		});
 		return { response: { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' } };
 	}
 }
@@ -452,7 +534,7 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 	data[p.w] = w;
 
 	if (action === 'newDoc') {
-		return newDoc(mongo.db, collection, conf, data);
+		return newDoc(mongo.db, collection, conf, data, mongo, request.user);
 	}
 
 	// action === 'findDoc'
@@ -471,6 +553,14 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 		try {
 			doc = await coll.find(findQuery).next();
 		} catch (err) {
+			logFromLink(mongo, {
+				level: 'error',
+				collection,
+				operation: 'write',
+				user: request.user,
+				message: 'ha ocurrido un error (findDoc => mongoOpWrite)',
+				err
+			});
 			return { response: { error: 'ha ocurrido un error', msg: 'findDoc => mongoOpWrite' } };
 		}
 
@@ -478,11 +568,19 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 			const wm = writeMode(conf, data, doc, now);
 			switch (wm) {
 				case 'overwrite':
-					return overwrite(coll, conf, findQuery, data);
+					return overwrite(coll, conf, findQuery, data, mongo, request.user);
 				case 'updateVersion': {
-					const updRes = await updateVersion(coll, conf, findQuery, data, doc);
+					const updRes = await updateVersion(coll, conf, findQuery, data, doc, mongo, request.user);
 					if (updRes.response?.error === 'concurrency_retry') {
 						attempt++;
+						logFromLink(mongo, {
+							level: 'warn',
+							collection,
+							operation: 'write',
+							user: request.user,
+							message: 'Concurrency conflict in updateVersion, retrying',
+							data: { attempt, maxRetries: MAX_RETRIES }
+						});
 						if (attempt >= MAX_RETRIES) {
 							return { response: { error: 'Conflicto de concurrencia en updateVersion tras múltiples intentos' } };
 						}
@@ -491,16 +589,32 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 					}
 					if (updRes.response?.error === 'switch_to_new_version') {
 						try {
-							return await executeNewVersion(mongo.client, mongo.db, collection, conf, findQuery, data, doc, now);
+							return await executeNewVersion(mongo.client, mongo.db, collection, conf, findQuery, data, doc, now, mongo, request.user);
 						} catch (err: any) {
 							if (err instanceof ConcurrentModificationError || err.name === 'ConcurrentModificationError') {
 								attempt++;
+								logFromLink(mongo, {
+									level: 'warn',
+									collection,
+									operation: 'write',
+									user: request.user,
+									message: 'Concurrency conflict in newVersion, retrying',
+									data: { attempt, maxRetries: MAX_RETRIES }
+								});
 								if (attempt >= MAX_RETRIES) {
 									return { response: { error: `Error newVersion concurrente tras ${MAX_RETRIES} intentos: ${err.message}` } };
 								}
 								await new Promise((r) => setTimeout(r, 10 * attempt + Math.floor(Math.random() * 20)));
 								continue;
 							}
+							logFromLink(mongo, {
+								level: 'error',
+								collection,
+								operation: 'write',
+								user: request.user,
+								message: 'ha ocurrido un error (error al versionar documentos)',
+								err
+							});
 							return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos' } };
 						}
 					}
@@ -508,21 +622,37 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 				}
 				case 'newVersion': {
 					try {
-						return await executeNewVersion(mongo.client, mongo.db, collection, conf, findQuery, data, doc, now);
+						return await executeNewVersion(mongo.client, mongo.db, collection, conf, findQuery, data, doc, now, mongo, request.user);
 					} catch (err: any) {
 						if (err instanceof ConcurrentModificationError || err.name === 'ConcurrentModificationError') {
 							attempt++;
+							logFromLink(mongo, {
+								level: 'warn',
+								collection,
+								operation: 'write',
+								user: request.user,
+								message: 'Concurrency conflict in newVersion, retrying',
+								data: { attempt, maxRetries: MAX_RETRIES }
+							});
 							if (attempt >= MAX_RETRIES) {
 								return { response: { error: `Error newVersion concurrente tras ${MAX_RETRIES} intentos: ${err.message}` } };
 							}
 							await new Promise((r) => setTimeout(r, 10 * attempt + Math.floor(Math.random() * 20)));
 							continue;
 						}
+						logFromLink(mongo, {
+							level: 'error',
+							collection,
+							operation: 'write',
+							user: request.user,
+							message: 'ha ocurrido un error (error al versionar documentos)',
+							err
+						});
 						return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos' } };
 					}
 				}
 				case 'close':
-					return closeDoc(coll, conf, findQuery, w);
+					return closeDoc(coll, conf, findQuery, w, mongo, request.user);
 				case 'unfair':
 					return { response: { error: 'write unfair' } };
 				default:
@@ -541,6 +671,14 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 				}
 				if (existingAny) {
 					attempt++;
+					logFromLink(mongo, {
+						level: 'warn',
+						collection,
+						operation: 'write',
+						user: request.user,
+						message: 'In-flight version transition detected, retrying write',
+						data: { attempt, maxRetries: MAX_RETRIES }
+					});
 					if (attempt >= MAX_RETRIES) {
 						return { response: { error: `Conflicto de concurrencia al buscar versión activa tras ${MAX_RETRIES} intentos` } };
 					}
@@ -550,9 +688,9 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 			}
 
 			if (!conf.idAuto) {
-				return newDoc(mongo.db, collection, conf, data);
+				return newDoc(mongo.db, collection, conf, data, mongo, request.user);
 			} else {
-				return newDoc(mongo.db, collection, conf, data);
+				return newDoc(mongo.db, collection, conf, data, mongo, request.user);
 			}
 		}
 	}

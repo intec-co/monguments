@@ -248,5 +248,35 @@ describe('Monguments CRUD Flow E2E', () => {
 			const indexNames = indexes.map((i: any) => i.name);
 			expect(indexNames).not.toContain('skipId_1_isLast_1');
 		});
+
+		it('should connect and create non-unique index when non-versionable collection has duplicate id documents', async () => {
+			const { mgConnectDb } = await import('../../lib');
+			const uri = await mgMock.mongoServer.getUri();
+			// Pre-populate duplicate documents in usercredentials
+			const rawColl = mg.getCollection('usercredentials');
+			await rawColl.insertMany([
+				{ user: 35931, sha2: 'hash1' },
+				{ user: 35931, sha2: 'hash2' }
+			]);
+
+			const connectedMg = await mgConnectDb(
+				{ uri, db: 'test_db' },
+				{
+					collections: {
+						usercredentials: {
+							id: 'user',
+							versionable: false,
+							properties: { closed: 'c', date: 'd', history: 'h', isLast: 'isLast', w: 'w' }
+						}
+					},
+					db: 'test_db'
+				}
+			);
+
+			const indexes = await connectedMg.getCollection('usercredentials').indexes();
+			const userIdx = indexes.find((i: any) => i.name === 'user_1');
+			expect(userIdx).toBeDefined();
+			expect(userIdx?.unique).toBeUndefined();
+		});
 	});
 });

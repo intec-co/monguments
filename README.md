@@ -31,6 +31,7 @@ A high-level TypeScript document management library for MongoDB providing built-
   - [MongoDB `$lookup` Stages](#mongodb-lookup-stages)
   - [Collection Links](#collection-links)
 - [Security & Hardening](#security--hardening)
+- [Logger Injection & Observability](#logger-injection--observability)
 - [Runtime Validation & Schemas](#runtime-validation--schemas)
 - [TypeScript Interfaces](#typescript-interfaces)
 - [AI & LLM Integration](#ai--llm-integration)
@@ -49,6 +50,7 @@ A high-level TypeScript document management library for MongoDB providing built-
 - 🔢 **Auto-Increment Numeric IDs**: Built-in sequence counter support using an internal `counters` collection (`idAuto: true`).
 - 🔗 **Aggregations & Lookups**: Simplified `$lookup` aggregation pipelines and relational collection linking.
 - 🛡️ **Hybrid Runtime Validation**: Strict Zod schema validation for collection configurations (`MgCollections`) during initialization, paired with high-performance native request validation for incoming operations (`MgRequest`, `AdvancedPermission`).
+- 📊 **Decoupled Logger Injection (`MgLogger`)**: Inject a callback function or logger object (`debug`, `info`, `warn`, `error`) to capture internal database errors, stacktraces, NoSQL security rejections, concurrency retries, and index creation events using your host application's logging pipeline.
 
 ---
 
@@ -539,10 +541,12 @@ const productIndexes = await monguments.ensureIndexes('products');
 For any configured collection, Monguments automatically provisions:
 1. **Entity Identifier (`id`)**:
    - Versionable (`versionable: true`): Compound index `{ [id]: 1, [isLast]: 1 }` for instant retrieval of active versions.
-   - Non-versionable: Unique index `{ [id]: 1 }` (`unique: true`).
+   - Non-versionable: Standard index `{ [id]: 1 }` (strict uniqueness is only applied when explicitly configured in `indexes`).
 2. **Access Control Owner (`owner`)**:
    - Versionable: Compound index `{ [owner]: 1, [isLast]: 1 }`.
    - Non-versionable: Single index `{ [owner]: 1 }`.
+3. **Custom Index Priority & Left-Prefix Superseding**:
+   - If a custom index in `indexes` defines the exact same keys as an automatic index (e.g. `{ user: 1 }` with `options: { unique: true }`), or starts with the automatic index keys as a **left-prefix** (e.g. `{ authorId: 1, isLast: 1, status: 1, date: -1 }` superseding `{ authorId: 1, isLast: 1 }`), the redundant automatic index is automatically skipped in favor of the custom index.
 
 #### Declarative Custom Indexes
 Collections can declare additional indexes directly in their schema via the `indexes` array:
@@ -612,6 +616,50 @@ For detailed security reports and benchmarks, see the [Security & NoSQL Injectio
 
 ---
 
+## Logger Injection & Observability
+
+As an embedded persistence library, `monguments` supports decoupled logger injection (`MgLogger`) so your host application can capture internal telemetry, database exceptions (including native `MongoServerError` stacktraces), security rejections, concurrency retries, and index creation events using its own logging system (e.g., Pino, Winston, CloudWatch).
+
+### 1. Injecting a Logger at Connection Time (`mgConnectDb`)
+You can pass a callback function `(entry: MgLogEntry) => void` or a structured object `{ log?, debug?, info?, warn?, error? }` in `options.logger` (or `conf.logger` / `client.logger`):
+
+```typescript
+import { mgConnectDb, MgLogEntry } from 'monguments';
+
+const monguments = await mgConnectDb(
+  { uri: 'mongodb://localhost:27017', db: 'shop' },
+  { db: 'shop', collections },
+  {
+    logger: (entry: MgLogEntry) => {
+      appLogger[entry.level]({
+        message: `[monguments] ${entry.message}`,
+        collection: entry.collection,
+        operation: entry.operation,
+        userId: entry.user,
+        err: entry.err,
+        data: entry.data
+      });
+    }
+  }
+);
+```
+
+### 2. Injecting or Updating on an Instance (`new Monguments` / `setLogger`)
+```typescript
+const monguments = new Monguments(db, collections, myLogger);
+
+// Or update at runtime across all collection links:
+monguments.setLogger(myLogger);
+```
+
+### 3. Captured Events & Fault Isolation
+- **`error`**: Native MongoDB driver errors (`insertOne`, `findOneAndUpdate`, `updateOne`, `aggregate`), transaction failures, and Tier 3 compensating rollback outcomes (`err` contains the original `Error`).
+- **`warn`**: NoSQL injection rejections (`$where`, unwhitelisted `$regex`), permission/ownership denials, closed document mutation attempts, workflow state conflicts, and link configuration warnings.
+- **`info`**: Automatic and custom index creation summary (`ensureIndexes`).
+- **Fault Isolation**: Logger callbacks are wrapped in a `try/catch` block so a throwing logger never interrupts database operations.
+
+---
+
 ## Runtime Validation & Schemas
 
 Monguments implements a high-performance **hybrid validation architecture**:
@@ -642,6 +690,7 @@ import {
   mgConnectDb,
   MgConf,
   MgClient,
+  MgConnectOptions,
   MgCollections,
   MgCollectionProperties,
   MgRequest,
@@ -653,7 +702,12 @@ import {
   MongoLookupPipeLine,
   AdvancedPermission,
   MgStateTransition,
-  MgWorkflowConfig
+  MgWorkflowConfig,
+  MgLogLevel,
+  MgLogEntry,
+  MgLogger,
+  MgLoggerFn,
+  MgLoggerObject
 } from 'monguments';
 ```
 

@@ -1,5 +1,35 @@
 import { Db, IndexDescription } from 'mongodb';
-import { MgCollectionProperties, MgCollections } from './types';
+import { MgCollectionProperties, MgCollections, MgIndexDefinition } from './types';
+
+function isPrefixOfIndex(
+	prefixKeys: Record<string, number | string>,
+	fullKeys: Record<string, number | string>
+): boolean {
+	const prefixEntries = Object.entries(prefixKeys);
+	const fullEntries = Object.entries(fullKeys);
+	if (prefixEntries.length === 0 || fullEntries.length < prefixEntries.length) {
+		return false;
+	}
+	for (let i = 0; i < prefixEntries.length; i++) {
+		if (
+			fullEntries[i][0] !== prefixEntries[i][0] ||
+			fullEntries[i][1] !== prefixEntries[i][1]
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function isSupersededByCustomIndexes(
+	autoKeys: Record<string, number | string>,
+	customIndexes?: MgIndexDefinition[]
+): boolean {
+	if (!Array.isArray(customIndexes) || customIndexes.length === 0) {
+		return false;
+	}
+	return customIndexes.some((idxDef) => isPrefixOfIndex(autoKeys, idxDef.fields));
+}
 
 export function buildCollectionIndexModels(
 	conf: MgCollectionProperties
@@ -10,30 +40,29 @@ export function buildCollectionIndexModels(
 	const idField = conf.id || '_id';
 	const isLastField = conf.versionable ? (conf.properties?.isLast || 'isLast') : '';
 
-	// 1. Entity Identifier Index (if not default _id)
+	// 1. Entity Identifier Index (if not default _id and not superseded by custom index)
 	if (idField !== '_id') {
 		const keys: Record<string, number> = conf.versionable
 			? { [idField]: 1, [isLastField]: 1 }
 			: { [idField]: 1 };
 		const keysStr = JSON.stringify(keys);
-		if (!seenKeys.has(keysStr)) {
+		if (!seenKeys.has(keysStr) && !isSupersededByCustomIndexes(keys, conf.indexes)) {
 			seenKeys.add(keysStr);
 			models.push({
 				key: keys,
-				name: conf.versionable ? `${idField}_1_${isLastField}_1` : `${idField}_1`,
-				...(conf.versionable ? {} : { unique: true })
+				name: conf.versionable ? `${idField}_1_${isLastField}_1` : `${idField}_1`
 			});
 		}
 	}
 
-	// 2. Owner Index (if present and distinct from id)
+	// 2. Owner Index (if present, distinct from id, and not superseded by custom index)
 	if (conf.owner && conf.owner !== idField) {
 		const ownerField = conf.owner;
 		const keys: Record<string, number> = conf.versionable
 			? { [ownerField]: 1, [isLastField]: 1 }
 			: { [ownerField]: 1 };
 		const keysStr = JSON.stringify(keys);
-		if (!seenKeys.has(keysStr)) {
+		if (!seenKeys.has(keysStr) && !isSupersededByCustomIndexes(keys, conf.indexes)) {
 			seenKeys.add(keysStr);
 			models.push({
 				key: keys,
@@ -72,7 +101,8 @@ export function buildCollectionIndexModels(
 export async function ensureIndexes(
 	db: Db,
 	collections: MgCollections,
-	targetCollection?: string
+	targetCollection?: string,
+	onIndexError?: (collection: string, indexName: string, err: unknown) => void
 ): Promise<Record<string, string[]>> {
 	const results: Record<string, string[]> = {};
 
@@ -95,8 +125,26 @@ export async function ensureIndexes(
 		}
 
 		const coll = db.collection(collName);
-		const createdNames = await coll.createIndexes(models);
-		results[collName] = createdNames;
+		try {
+			const createdNames = await coll.createIndexes(models);
+			results[collName] = createdNames;
+		} catch (batchErr: unknown) {
+			const createdNames: string[] = [];
+			if (typeof coll.createIndex === 'function') {
+				for (const model of models) {
+					try {
+						const { key, ...opts } = model;
+						const idxName = await coll.createIndex(key, opts);
+						createdNames.push(idxName);
+					} catch (singleErr: unknown) {
+						onIndexError?.(collName, model.name || JSON.stringify(model.key), singleErr);
+					}
+				}
+			} else {
+				onIndexError?.(collName, 'batch', batchErr);
+			}
+			results[collName] = createdNames;
+		}
 	}
 
 	return results;

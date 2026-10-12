@@ -9,6 +9,7 @@ import { validateMgRequest, validateAdvancedPermissions } from './request-valida
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { transition } from './operation-transition';
+import { logResultIfError } from './logger';
 
 const check = (
 	link: Link,
@@ -66,25 +67,33 @@ const check = (
 export const docProcess = async (
 	link: Link, collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]
 ): Promise<MgResult> => {
+	const opName = request?.operation || 'process';
+	const userId = request?.user;
 	const checkErr = check(link, collection, request, permissions, advancedPermissions);
 	if (checkErr) {
-		return { response: { error: checkErr } };
+		const errRes: MgResult = { response: { error: checkErr } };
+		logResultIfError(link, collection, opName, userId, errRes);
+		return errRes;
 	}
 
 	let permission: string;
 	let owner: string;
 	let collProperties: MgCollectionProperties | undefined;
+	let result: MgResult;
+	let caughtErr: unknown;
 
 	switch (request.operation) {
 		case 'write':
-			return docWrite(link, collection, request, permissions);
-		case 'count':
+			result = await docWrite(link, collection, request, permissions);
+			break;
+		case 'count': {
 			permission = permissions.charAt(0);
 			const conf = link.getCollectionProperties(collection);
 			if (conf) {
 				if (permission === 'r') {
 					if (!conf.owner) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 					if (!request.data) {
 						request.data = {};
@@ -97,24 +106,31 @@ export const docProcess = async (
 					}
 					try {
 						const count = await link.collection(collection).countDocuments(request.data);
-						return { data: count ? count : 0 };
+						result = { data: count ? count : 0 };
 					} catch (err: any) {
-						return { response: { error: err?.message || 'Error al contar documentos' } };
+						caughtErr = err;
+						result = { response: { error: err?.message || 'Error al contar documentos' } };
 					}
 				} else {
-					return { response: { error: 'No tiene permisos para esta operación' } };
+					result = { response: { error: 'No tiene permisos para esta operación' } };
 				}
 			} else {
-				return { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = { response: { error: `La colección: ${collection} no esta configurada` } };
 			}
+			break;
+		}
 		case 'read':
-			return readDoc(link, collection, request, permissions, advancedPermissions);
+			result = await readDoc(link, collection, request, permissions, advancedPermissions);
+			break;
 		case 'readList':
-			return readList(link, collection, request, permissions, advancedPermissions);
+			result = await readList(link, collection, request, permissions, advancedPermissions);
+			break;
 		case 'set':
-			return docSet(link, collection, request, permissions);
+			result = await docSet(link, collection, request, permissions);
+			break;
 		case 'transition':
-			return transition(link, collection, request, advancedPermissions);
+			result = await transition(link, collection, request, advancedPermissions);
+			break;
 		case 'add':
 			permission = permissions.charAt(1);
 			collProperties = link.getCollectionProperties(collection);
@@ -122,7 +138,8 @@ export const docProcess = async (
 				owner = collProperties.owner;
 				if (permission === 'w') {
 					if (!owner) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 					if (!request.data) {
 						request.data = {};
@@ -133,22 +150,25 @@ export const docProcess = async (
 					if (request.data.query[owner] === undefined) {
 						request.data.query[owner] = request.user;
 					} else if (request.data.query[owner] !== request.user) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 					if (request.data[owner] === undefined) {
 						request.data[owner] = request.user;
 					} else if (request.data[owner] !== request.user) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 				}
 				if (hasPermission(permission, owner, request)) {
-					return add(link, collection, request);
+					result = await add(link, collection, request);
 				} else {
-					return { response: { error: 'No tiene permisos para esta operación' } };
+					result = { response: { error: 'No tiene permisos para esta operación' } };
 				}
 			} else {
-				return { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = { response: { error: `La colección: ${collection} no esta configurada` } };
 			}
+			break;
 		case 'close':
 			permission = permissions.charAt(1);
 			collProperties = link.getCollectionProperties(collection);
@@ -156,7 +176,8 @@ export const docProcess = async (
 				owner = collProperties.owner;
 				if (permission === 'w') {
 					if (!owner) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 					if (!request.data) {
 						request.data = {};
@@ -164,18 +185,24 @@ export const docProcess = async (
 					if (request.data[owner] === undefined) {
 						request.data[owner] = request.user;
 					} else if (request.data[owner] !== request.user) {
-						return { response: { error: 'No tiene permisos para esta operación' } };
+						result = { response: { error: 'No tiene permisos para esta operación' } };
+						break;
 					}
 				}
 				if (hasPermission(permission, owner, request)) {
-					return close(link, collection, request);
+					result = await close(link, collection, request);
 				} else {
-					return { response: { error: 'No tiene permisos para esta operación' } };
+					result = { response: { error: 'No tiene permisos para esta operación' } };
 				}
 			} else {
-				return { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = { response: { error: `La colección: ${collection} no esta configurada` } };
 			}
+			break;
 		default:
-			return { response: { error: 'Operación no definida' } };
+			result = { response: { error: 'Operación no definida' } };
+			break;
 	}
+
+	logResultIfError(link, collection, opName, userId, result, caughtErr);
+	return result;
 };

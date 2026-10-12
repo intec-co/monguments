@@ -76,10 +76,35 @@ export type MgW = {
 	ips?: Array<string>;
 }
 
+export type MgLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export type MgLogEntry = {
+	level: MgLogLevel;
+	message: string;
+	collection?: string;
+	operation?: string;
+	user?: number;
+	err?: unknown;
+	data?: Record<string, unknown>;
+}
+
+export type MgLoggerFn = (entry: MgLogEntry) => void;
+
+export type MgLoggerObject = {
+	log?: MgLoggerFn;
+	debug?: (entry: MgLogEntry) => void;
+	info?: (entry: MgLogEntry) => void;
+	warn?: (entry: MgLogEntry) => void;
+	error?: (entry: MgLogEntry) => void;
+}
+
+export type MgLogger = MgLoggerFn | MgLoggerObject;
+
 export type MgClient = {
 	collections: any;
 	db: string;
 	ensureIndexes?: boolean;
+	logger?: MgLogger;
 }
 export type MgResult = {
 	data?: any;
@@ -93,9 +118,11 @@ export type MgConf = {
 	uri: string;
 	db: string;
 	ensureIndexes?: boolean;
+	logger?: MgLogger;
 }
 export type MgConnectOptions = {
 	ensureIndexes?: boolean;
+	logger?: MgLogger;
 }
 export type MgRequest = {
 	data: any;

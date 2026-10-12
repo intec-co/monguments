@@ -3,14 +3,25 @@ import { hasPermission } from './has-permission';
 import { AdvancedPermission, MgCollectionProperties, MgLink, MgRequest, MgResult } from './types';
 import { Link } from './db-link';
 import { isInclusiveProjection, validateQueryFilter } from './query-validator';
+import { logFromLink } from './logger';
 
-function verifyPermissions(singleLink: MgLink, collectionConf: MgCollectionProperties, collectionName: string): boolean {
+function verifyPermissions(mongo: Link, singleLink: MgLink, collectionConf: MgCollectionProperties, collectionName: string, req: MgRequest): boolean {
 	if (singleLink && singleLink.collection && singleLink.from && singleLink.to) {
 		if (collectionConf.link && collectionConf.link[singleLink.collection]) {
 			return true;
 		}
 	}
-	console.error(`The collection ${collectionName} hasn't link to ${singleLink.collection}`);
+	logFromLink(
+		mongo,
+		{
+			level: 'warn',
+			collection: collectionName,
+			operation: req.operation || 'read',
+			user: req.user,
+			message: `The collection ${collectionName} hasn't link to ${singleLink.collection}`
+		},
+		true
+	);
 
 	return false;
 }
@@ -35,17 +46,37 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 
 	const lookupStages: any[] = [];
 	for (const singleLink of req.params.link) {
-		if (verifyPermissions(singleLink, collectionConf, collection)) {
+		if (verifyPermissions(mongo, singleLink, collectionConf, collection, req)) {
 			const collectionLink = singleLink.collection;
 			const collectionLinkConf = mongo.getCollectionProperties(collectionLink);
 			if (collectionLinkConf) {
 				if (collectionLinkConf.owner) {
 					if (!collectionConf.owner) {
-						console.error(`The collection ${collection} hasn't owner for link to ${collectionLink}`);
+						logFromLink(
+							mongo,
+							{
+								level: 'warn',
+								collection,
+								operation: req.operation || 'read',
+								user: req.user,
+								message: `The collection ${collection} hasn't owner for link to ${collectionLink}`
+							},
+							true
+						);
 						continue;
 					}
 					if (singleLink.from !== collectionConf.owner) {
-						console.error(`The link from '${singleLink.from}' doesn't match root collection ${collection} owner '${collectionConf.owner}'`);
+						logFromLink(
+							mongo,
+							{
+								level: 'warn',
+								collection,
+								operation: req.operation || 'read',
+								user: req.user,
+								message: `The link from '${singleLink.from}' doesn't match root collection ${collection} owner '${collectionConf.owner}'`
+							},
+							true
+						);
 						continue;
 					}
 				}
@@ -71,13 +102,34 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 							}
 						}
 					} catch (e) {
-						console.error('catch in parse link query');
+						logFromLink(
+							mongo,
+							{
+								level: 'warn',
+								collection,
+								operation: req.operation || 'read',
+								user: req.user,
+								message: 'catch in parse link query',
+								err: e
+							},
+							true
+						);
 						continue;
 					}
 				}
 
 				if (collectionLinkConf.owner && targetForeignField !== collectionLinkConf.owner) {
-					console.error(`The target query field '${targetForeignField}' doesn't match linked collection ${collectionLink} owner '${collectionLinkConf.owner}'`);
+					logFromLink(
+						mongo,
+						{
+							level: 'warn',
+							collection,
+							operation: req.operation || 'read',
+							user: req.user,
+							message: `The target query field '${targetForeignField}' doesn't match linked collection ${collectionLink} owner '${collectionLinkConf.owner}'`
+						},
+						true
+					);
 					continue;
 				}
 
@@ -85,7 +137,17 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 					const isFullSearch = collectionLinkConf.regexFullSearch === true;
 					const validExtra = validateQueryFilter(extraConditions, 0, isFullSearch);
 					if (!validExtra.valid) {
-						console.error(`Invalid extraConditions in link query for ${collectionLink}: ${validExtra.reason}`);
+						logFromLink(
+							mongo,
+							{
+								level: 'warn',
+								collection,
+								operation: req.operation || 'read',
+								user: req.user,
+								message: `Invalid extraConditions in link query for ${collectionLink}: ${validExtra.reason}`
+							},
+							true
+						);
 						continue;
 					}
 				}

@@ -21,6 +21,11 @@ import {
   MgLink,
   MongoLookup,
   MongoLookupPipeLine,
+  MgLogLevel,
+  MgLogEntry,
+  MgLogger,
+  MgLoggerFn,
+  MgLoggerObject,
   mgCollectionsSchema,
   mgRequestSchema,
   advancedPermissionSchema
@@ -32,11 +37,16 @@ import {
 ## 2. Initialization
 
 ### Method A: Connect Helper (`mgConnectDb`)
-By default, `mgConnectDb` automatically checks and creates all collection indexes (`ensureIndexes: true`). You can set `ensureIndexes: false` in `conf`, `client`, or `options` to skip index creation on connection:
+By default, `mgConnectDb` automatically checks and creates all collection indexes (`ensureIndexes: true`). You can set `ensureIndexes: false` in `conf`, `client`, or `options` to skip index creation on connection, and optionally inject a `logger` (`MgLogger`):
 ```typescript
 const monguments = await mgConnectDb(
   { uri: 'mongodb://localhost:27017', db: 'my_db', ensureIndexes: true },
-  { db: 'my_db', collections }
+  { db: 'my_db', collections },
+  {
+    logger: (entry: MgLogEntry) => {
+      appLogger[entry.level]({ message: entry.message, err: entry.err, data: entry.data });
+    }
+  }
 );
 
 // Skip automatic index creation during connection:
@@ -50,7 +60,8 @@ const mongumentsNoIdx = await mgConnectDb(
 ```typescript
 import { Db } from 'mongodb';
 
-const monguments = new Monguments(db, collections);
+const monguments = new Monguments(db, collections, myLogger);
+monguments.setLogger(myLogger); // Optional runtime update
 await monguments.ensureIndexes(); // Optional manual execution
 ```
 
@@ -469,4 +480,37 @@ Check `result.response?.error` or handle thrown `Error` instances in try/catch b
 - **Result Output**: Returns `MgResult` with `response.error`:
   - Request error: `response: { error: 'Invalid request: <error-details>' }`
   - Advanced permissions error: `response: { error: 'Invalid advancedPermissions: <error-details>' }`
+
+---
+
+## 9. Decoupled Logger Injection & Observability (`MgLogger`)
+
+Host applications can inject an optional `MgLogger` (callback function or structured object) to capture internal database exceptions (with native `Error` / `MongoServerError` stacktraces), NoSQL injection security rejections, permission denials, concurrency retries, compensating rollbacks, and index creation events.
+
+```typescript
+export type MgLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export type MgLogEntry = {
+  level: MgLogLevel;
+  message: string;
+  collection?: string;
+  operation?: string;
+  user?: number;
+  err?: unknown;
+  data?: Record<string, unknown>;
+};
+
+export type MgLoggerFn = (entry: MgLogEntry) => void;
+
+export type MgLoggerObject = {
+  log?: MgLoggerFn;
+  debug?: (entry: MgLogEntry) => void;
+  info?: (entry: MgLogEntry) => void;
+  warn?: (entry: MgLogEntry) => void;
+  error?: (entry: MgLogEntry) => void;
+};
+
+export type MgLogger = MgLoggerFn | MgLoggerObject;
+```
+
 

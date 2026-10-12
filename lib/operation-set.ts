@@ -2,6 +2,7 @@ import { Collection } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult } from './types';
 import { validateDocumentData, validateQueryFilter } from './query-validator';
+import { logFromLink } from './logger';
 
 async function writeSet(
 	coll: Collection,
@@ -9,7 +10,9 @@ async function writeSet(
 	request: MgRequest,
 	opened: boolean,
 	toClosed: boolean,
-	customQuery?: any
+	customQuery?: any,
+	mongo?: Link,
+	collectionName?: string
 ): Promise<MgResult> {
 	let setObj: any = {};
 	const push: any = {};
@@ -75,6 +78,14 @@ async function writeSet(
 			}
 			return { response: { msg: 'información guardada' } };
 		} catch (err) {
+			logFromLink(mongo, {
+				level: 'error',
+				collection: collectionName || coll.collectionName,
+				operation: 'set',
+				user: request.user,
+				message: 'ha ocurrido un error (error mongo.set document)',
+				err
+			});
 			return { response: { error: 'ha ocurrido un error', msg: 'error mongo.set document' } };
 		}
 	} else {
@@ -118,7 +129,9 @@ export async function set(mongo: Link, collection: string, request: MgRequest): 
 					{ ...request, data: { ...request.data, query } },
 					true,
 					false,
-					targetQuery
+					targetQuery,
+					mongo,
+					collection
 				);
 				if (atomicRes.response && atomicRes.response.msg) {
 					return atomicRes;
@@ -148,12 +161,20 @@ export async function set(mongo: Link, collection: string, request: MgRequest): 
 						opened = true;
 					}
 				}
-				return writeSet(coll, conf, { ...request, data: { ...request.data, query } }, opened, toClosed);
+				return writeSet(coll, conf, { ...request, data: { ...request.data, query } }, opened, toClosed, undefined, mongo, collection);
 			} catch (err) {
+				logFromLink(mongo, {
+					level: 'error',
+					collection,
+					operation: 'set',
+					user: request.user,
+					message: 'error en mongo.set',
+					err
+				});
 				return { response: { error: 'error en mongo.set' } };
 			}
 		} else {
-			return writeSet(coll, conf, { ...request, data: { ...request.data, query } }, true, false);
+			return writeSet(coll, conf, { ...request, data: { ...request.data, query } }, true, false, undefined, mongo, collection);
 		}
 	}
 	return { response: { error: 'Colección no configurada' } };

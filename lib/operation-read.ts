@@ -2,6 +2,7 @@ import { AggregationCursor, FindCursor } from 'mongodb';
 import { isInclusiveProjection, processAndValidateRegex, validateQueryFilter, validateReadParams } from './query-validator';
 import { Link } from './db-link';
 import { MGParamsRead, MgRequestRead } from './types';
+import { logFromLink } from './logger';
 
 function readAggregation(mongo: Link, collection: string, query: any, params: MGParamsRead): AggregationCursor {
 	const aggregation = [];
@@ -98,7 +99,16 @@ export function read(mongo: Link, collection: string, request: MgRequestRead, op
 			if (params.project._id === undefined) { params.project._id = 0; }
 		}
 	} else {
-		console.error(`No se encontró configuración para ${collection}`);
+		logFromLink(
+			mongo,
+			{
+				level: 'error',
+				collection,
+				operation,
+				message: `No se encontró configuración para ${collection}`
+			},
+			true
+		);
 	}
 
 	if (params && params.limit !== undefined && params.limit > maxLimit) {

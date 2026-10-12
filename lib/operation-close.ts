@@ -1,6 +1,7 @@
 import { Link } from './db-link';
 import { MgRequest, MgResult } from './types';
 import { validateQueryFilter } from './query-validator';
+import { logFromLink } from './logger';
 
 export const close = async (mongo: Link, collection: string, request: MgRequest): Promise<MgResult> => {
 	const conf = mongo.getCollectionProperties(collection);
@@ -118,12 +119,28 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 						return { response: { error: 'no tiene permisos de cerrar el documento' } };
 					}
 				} catch (err) {
+					logFromLink(mongo, {
+						level: 'error',
+						collection,
+						operation: 'close',
+						user: request.user,
+						message: 'ha ocurrido un error (error buscando el documento a cerrar)',
+						err
+					});
 					return { response: { error: 'ha ocurrido un error', msg: 'error buscando el documento a cerrar' } };
 				}
 			}
 			return { response: { error: 'no se encontro el documento a cerrar' } };
 		}
 	} catch (errUpdate) {
+		logFromLink(mongo, {
+			level: 'error',
+			collection,
+			operation: 'close',
+			user: request.user,
+			message: 'ha ocurrido un error (error cerrando el documento a cerrar)',
+			err: errUpdate
+		});
 		return { response: { error: 'ha ocurrido un error', msg: 'error cerrando el documento a cerrar' } };
 	}
 };
