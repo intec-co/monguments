@@ -162,11 +162,39 @@ const result = await monguments.transition('articles', transitionRequest, advanc
 
 ---
 
-## 4. Validation & Error Responses (Zod Schemas)
+## 4. Validation & Error Responses
 
-Every request routed via `process()` is pre-validated at runtime against Zod schemas ([`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts)):
-- **Request Payload (`mgRequestSchema`)**: Ensures `user`, `operation`, `data`, and `params` conform to expected types.
-- **Permissions (`advancedPermissionSchema`)**: Validates 2-character strings (e.g. `'rw'`, `'RW'`) or structured permission objects.
+Every request routed via `process()` is pre-validated at runtime against [`lib/request-validator.ts`](file:///Users/cavargasp/projects/monguments/lib/request-validator.ts) and [`lib/schemas.ts`](file:///Users/cavargasp/projects/monguments/lib/schemas.ts):
+- **Request Payload (`validateMgRequest`)**: Ensures `user`, `operation`, `data`, and `params` conform to expected types.
+- **Permissions (`validateAdvancedPermissions`)**: Validates 2-character strings (e.g. `'rw'`, `'RW'`) or structured permission objects.
 
-If validation fails, `process()` returns an `MgResult` with `data: null` and `response.error` containing the Zod validation failure details (e.g., `'Invalid request parameter: ...'`).
+If validation fails, `process()` returns an `MgResult` with `data: null` and `response.error` containing the validation failure details (e.g., `'Invalid request: ...'`).
+
+---
+
+## 5. Logger Injection & Observability (`MgLogger`)
+
+Host applications can inject an optional `MgLogger` (callback `(entry: MgLogEntry) => void` or object `{ log?, debug?, info?, warn?, error? }`) via `mgConnectDb(conf, client, { logger })`, `new Monguments(db, collections, logger)`, or `monguments.setLogger(logger)`:
+
+```typescript
+import { mgConnectDb, MgLogEntry } from 'monguments';
+
+const monguments = await mgConnectDb(
+  { uri: 'mongodb://localhost:27017', db: 'app' },
+  { db: 'app', collections },
+  {
+    logger: (entry: MgLogEntry) => {
+      appLogger[entry.level]({
+        message: entry.message,
+        collection: entry.collection,
+        operation: entry.operation,
+        userId: entry.user,
+        err: entry.err,
+        data: entry.data
+      });
+    }
+  }
+);
+```
+
 
