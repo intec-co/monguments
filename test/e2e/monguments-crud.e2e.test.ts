@@ -200,4 +200,53 @@ describe('Monguments CRUD Flow E2E', () => {
 			expect(allProps.versionable1).toBeDefined();
 		});
 	});
+
+	describe('Connection initialization index creation (mgConnectDb)', () => {
+		it('should automatically provision indexes by default on connection', async () => {
+			const { mgConnectDb } = await import('../../lib');
+			const uri = await mgMock.mongoServer.getUri();
+			const connectedMg = await mgConnectDb(
+				{ uri, db: 'test_db' },
+				{
+					collections: {
+						idxTest: {
+							id: 'customId',
+							versionable: true,
+							owner: 'userId',
+							properties: { closed: 'c', date: 'd', history: 'h', isLast: 'isLast', w: 'w' }
+						}
+					},
+					db: 'test_db'
+				}
+			);
+
+			const indexes = await connectedMg.getCollection('idxTest').indexes();
+			const indexNames = indexes.map((i: any) => i.name);
+			expect(indexNames).toContain('customId_1_isLast_1');
+			expect(indexNames).toContain('userId_1_isLast_1');
+		});
+
+		it('should skip index creation when ensureIndexes is false', async () => {
+			const { mgConnectDb } = await import('../../lib');
+			const uri = await mgMock.mongoServer.getUri();
+			const connectedMg = await mgConnectDb(
+				{ uri, db: 'test_db', ensureIndexes: false },
+				{
+					collections: {
+						skipIdxTest: {
+							id: 'skipId',
+							versionable: true,
+							properties: { closed: 'c', date: 'd', history: 'h', isLast: 'isLast', w: 'w' }
+						}
+					},
+					db: 'test_db'
+				}
+			);
+
+			const coll = connectedMg.getCollection('skipIdxTest');
+			const indexes = await coll.indexes().catch(() => []);
+			const indexNames = indexes.map((i: any) => i.name);
+			expect(indexNames).not.toContain('skipId_1_isLast_1');
+		});
+	});
 });

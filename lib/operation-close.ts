@@ -31,6 +31,9 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 		[idColl]: request.data[idColl],
 		[p.closed]: { $ne: true }
 	};
+	if (conf.owner && request.data[conf.owner] !== undefined) {
+		baseQuery[conf.owner] = request.data[conf.owner];
+	}
 
 	const updatePipeline = [
 		{

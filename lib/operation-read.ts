@@ -1,5 +1,5 @@
 import { AggregationCursor, FindCursor } from 'mongodb';
-import { processAndValidateRegex, validateQueryFilter, validateReadParams } from './query-validator';
+import { isInclusiveProjection, processAndValidateRegex, validateQueryFilter, validateReadParams } from './query-validator';
 import { Link } from './db-link';
 import { MGParamsRead, MgRequestRead } from './types';
 
@@ -29,6 +29,13 @@ function readAggregation(mongo: Link, collection: string, query: any, params: MG
 		aggregation.push({ $limit: params.limit });
 	}
 	if (params.project) {
+		if (isInclusiveProjection(params.project) && params.link) {
+			for (const singleLink of params.link) {
+				if (singleLink.to && params.project[singleLink.to] === undefined) {
+					params.project[singleLink.to] = 1;
+				}
+			}
+		}
 		aggregation.push({ $project: params.project });
 	}
 

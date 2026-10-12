@@ -270,5 +270,59 @@ describe('DocProcess Unit', () => {
 			const res = await docProcess(mockLink, 'test', { data: {}, operation: 'close' }, 'R--');
 			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
 		});
+
+		it('should auto-inject owner in query on add operation when permission is lowercase w', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId' });
+			(hasPermission as Mock).mockReturnValue(true);
+			(add as Mock).mockResolvedValue({ response: { msg: 'Added' } });
+
+			const req: any = { user: 123, data: { query: { id: 1 }, add: { tags: 'tag1' } }, operation: 'add' };
+			const res = await docProcess(mockLink, 'test', req, 'rw_');
+
+			expect(req.data.query.ownerId).toBe(123);
+			expect(req.data.ownerId).toBe(123);
+			expect(add).toHaveBeenCalledWith(mockLink, 'test', req);
+			expect(res).toEqual({ response: { msg: 'Added' } });
+		});
+
+		it('should reject add operation when permission is lowercase w and collection has no owner', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({ versionable: false });
+
+			const req: any = { user: 123, data: { query: { id: 1 }, add: { tags: 'tag1' } }, operation: 'add' };
+			const res = await docProcess(mockLink, 'test', req, 'rw_');
+
+			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
+
+		it('should reject add operation when permission is lowercase w and query owner does not match user', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId' });
+
+			const req: any = { user: 123, data: { query: { id: 1, ownerId: 999 }, add: { tags: 'tag1' } }, operation: 'add' };
+			const res = await docProcess(mockLink, 'test', req, 'rw_');
+
+			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
+
+		it('should auto-inject owner in data on close operation when permission is lowercase w', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId' });
+			(hasPermission as Mock).mockReturnValue(true);
+			(close as Mock).mockResolvedValue({ response: { msg: 'Closed' } });
+
+			const req: any = { user: 123, data: { _id: 10 }, operation: 'close' };
+			const res = await docProcess(mockLink, 'test', req, 'rw_');
+
+			expect(req.data.ownerId).toBe(123);
+			expect(close).toHaveBeenCalledWith(mockLink, 'test', req);
+			expect(res).toEqual({ response: { msg: 'Closed' } });
+		});
+
+		it('should reject close operation when permission is lowercase w and collection has no owner', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({ versionable: false });
+
+			const req: any = { user: 123, data: { _id: 10 }, operation: 'close' };
+			const res = await docProcess(mockLink, 'test', req, 'rw_');
+
+			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+		});
 	});
 });

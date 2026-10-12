@@ -14,6 +14,7 @@ import { read } from './operation-read';
 import { set } from './operation-set';
 import { write } from './operation-write';
 import { transition } from './operation-transition';
+import { ensureIndexes as opEnsureIndexes } from './operation-indexes';
 import { AdvancedPermission } from './types';
 import { mgCollectionsSchema } from './schemas';
 
@@ -23,6 +24,7 @@ export interface Monguments {
 	readonly collectionsProperties: MgCollections;
 	add(collection: string, request: MgRequest): Promise<MgResult>;
 	close(collection: string, request: MgRequest): Promise<MgResult>;
+	ensureIndexes(collection?: string): Promise<Record<string, string[]>>;
 	getCollection(collection: string): Collection;
 	getCollectionId(collection: string): string;
 	getCollectionProperties(collection: string): MgCollectionProperties | undefined;
@@ -145,6 +147,9 @@ export function createMonguments(db: Db, collections: MgCollections, client?: Mo
 		},
 		async write(collection: string, request: MgRequest): Promise<MgResult> {
 			return write(link, collection, request);
+		},
+		async ensureIndexes(collection?: string): Promise<Record<string, string[]>> {
+			return opEnsureIndexes(db, normalizedCollections, collection);
 		}
 	});
 }

@@ -56,6 +56,9 @@ async function writeAdd(
 
 		update.$push = push;
 		const queryToUse = customQuery || request.data.query;
+		if (conf.owner && request.data[conf.owner] !== undefined && queryToUse[conf.owner] === undefined) {
+			queryToUse[conf.owner] = request.data[conf.owner];
+		}
 		try {
 			const result = await coll.updateOne(queryToUse, update, { upsert: false });
 			if (customQuery) {

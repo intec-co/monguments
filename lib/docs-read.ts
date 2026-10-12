@@ -2,6 +2,7 @@ import { read } from './operation-read';
 import { hasPermission } from './has-permission';
 import { AdvancedPermission, MgCollectionProperties, MgLink, MgRequest, MgResult } from './types';
 import { Link } from './db-link';
+import { isInclusiveProjection, validateQueryFilter } from './query-validator';
 
 function verifyPermissions(singleLink: MgLink, collectionConf: MgCollectionProperties, collectionName: string): boolean {
 	if (singleLink && singleLink.collection && singleLink.from && singleLink.to) {
@@ -80,19 +81,49 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 					continue;
 				}
 
-				if (isVersionable) {
-					const pipeline: any[] = [
-						{
-							$match: {
-								$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
-								...(isLast ? { [isLast]: true } : {}),
-								...extraConditions
-							}
-						}
-					];
-					if (!singleLink.asArray) {
-						pipeline.push({ $limit: 1 });
+				if (Object.keys(extraConditions).length > 0) {
+					const isFullSearch = collectionLinkConf.regexFullSearch === true;
+					const validExtra = validateQueryFilter(extraConditions, 0, isFullSearch);
+					if (!validExtra.valid) {
+						console.error(`Invalid extraConditions in link query for ${collectionLink}: ${validExtra.reason}`);
+						continue;
 					}
+				}
+
+				if (req.params && req.params.project && isInclusiveProjection(req.params.project)) {
+					if (req.params.project[singleLink.to] === undefined) {
+						req.params.project[singleLink.to] = 1;
+					}
+				}
+
+				const asArray = singleLink.asArray === true;
+				const hasCustomArrayOptions = asArray || singleLink.limit !== undefined || singleLink.sort !== undefined || singleLink.skip !== undefined;
+				const usePipeline = isVersionable || Object.keys(extraConditions).length > 0 || hasCustomArrayOptions;
+
+				if (usePipeline) {
+					const matchDoc: Record<string, any> = {
+						$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
+						...(isLast ? { [isLast]: true } : {}),
+						...extraConditions
+					};
+					const pipeline: any[] = [{ $match: matchDoc }];
+
+					if (!asArray) {
+						pipeline.push({ $limit: 1 });
+					} else {
+						if (singleLink.sort !== undefined) {
+							pipeline.push({ $sort: singleLink.sort });
+						}
+						if (singleLink.skip !== undefined && singleLink.skip > 0) {
+							pipeline.push({ $skip: singleLink.skip });
+						}
+						const maxLimit = collectionLinkConf.maxLimit || 1000;
+						const effectiveLimit = (singleLink.limit !== undefined && singleLink.limit > 0)
+							? Math.min(singleLink.limit, maxLimit)
+							: maxLimit;
+						pipeline.push({ $limit: effectiveLimit });
+					}
+
 					if (projection) {
 						const projCopy = { ...projection };
 						if (collectionLinkConf.id !== '_id' && projCopy._id === undefined) {
@@ -100,6 +131,7 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 						}
 						pipeline.push({ $project: projCopy });
 					}
+
 					lookupStages.push({
 						$lookup: {
 							from: collectionLink,
@@ -109,46 +141,17 @@ function prepareLinkLookup(mongo: Link, collection: string, req: MgRequest): voi
 						}
 					});
 				} else {
-					if (Object.keys(extraConditions).length > 0) {
-						const pipeline: any[] = [
-							{
-								$match: {
-									$expr: { $eq: [`$${targetForeignField}`, '$$fromVal'] },
-									...extraConditions
-								}
-							}
-						];
-						if (!singleLink.asArray) {
-							pipeline.push({ $limit: 1 });
+					lookupStages.push({
+						$lookup: {
+							from: collectionLink,
+							localField: singleLink.from,
+							foreignField: targetForeignField,
+							as: singleLink.to
 						}
-						if (projection) {
-							const projCopy = { ...projection };
-							if (collectionLinkConf.id !== '_id' && projCopy._id === undefined) {
-								projCopy._id = 0;
-							}
-							pipeline.push({ $project: projCopy });
-						}
-						lookupStages.push({
-							$lookup: {
-								from: collectionLink,
-								let: { fromVal: `$${singleLink.from}` },
-								pipeline,
-								as: singleLink.to
-							}
-						});
-					} else {
-						lookupStages.push({
-							$lookup: {
-								from: collectionLink,
-								localField: singleLink.from,
-								foreignField: targetForeignField,
-								as: singleLink.to
-							}
-						});
-					}
+					});
 				}
 
-				if (!singleLink.asArray) {
+				if (!asArray) {
 					lookupStages.push({
 						$addFields: {
 							[singleLink.to]: { $arrayElemAt: [`$${singleLink.to}`, 0] }

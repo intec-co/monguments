@@ -193,6 +193,7 @@ const collections: MgCollections = {
 | `setClosed` | `string[] \| '*'` | `[]` | Fields allowed for `set` even when document is closed. |
 | `required` | `string[]` | `[]` | Required fields during `write` operations. |
 | `workflow` | `MgWorkflowConfig` | `undefined` | State machine workflow rules and allowed state transitions (see [docs/workflows.md](docs/workflows.md)). |
+| `indexes` | `MgIndexDefinition[]` | `undefined` | Declarative custom indexes specification for the collection. |
 | `properties` | `MgNameDocProperties` | *(Required)* | Mappings for internal metadata field names. |
 
 ### Important Rules & Constraints
@@ -491,12 +492,77 @@ const request: MgRequestRead = {
         to: 'category',
         query: '{"id":from}', // Override foreign key matching: maps 'from' to foreign 'id'
         asArray: false
+      },
+      {
+        collection: 'reviews',
+        from: 'productId',
+        to: 'recentReviews',
+        query: '{"targetProduct":from}',
+        asArray: true,
+        sort: { rating: -1 },
+        skip: 0,
+        limit: 10 // Capped by target collection maxLimit (default: 1000)
       }
     ]
   }
 };
 
 const cursor = monguments.read('products', request);
+```
+
+#### Relational BSON 16 MB Overflow Protection
+When `asArray: true` is configured, Monguments transforms lookups into aggregation pipelines with an automatic safety `$limit` ceiling (`collectionLinkConf.maxLimit || 1000`). Custom `limit` (capped by `maxLimit`), `skip`, and `sort` options in `MgLink` are supported to prevent unbounded arrays from exceeding MongoDB's 16 MB BSON document size limit.
+
+---
+
+### Index Management (`ensureIndexes`)
+
+By default, when initializing a connection via `mgConnectDb`, Monguments automatically verifies and provisions all required indexes (`ensureIndexes: true`). To disable automatic index creation on connection, set `ensureIndexes: false` in `conf`, `client`, or connection options:
+
+```typescript
+// Default: automatically checks and creates indexes upon connection
+const monguments = await mgConnectDb({ uri, db: 'shop' }, { collections, db: 'shop' });
+
+// Disable automatic index creation on connection
+const mongumentsNoIdx = await mgConnectDb(
+  { uri, db: 'shop', ensureIndexes: false },
+  { collections, db: 'shop' }
+);
+
+// Manual invocation at any time:
+const report = await monguments.ensureIndexes();
+// Or for a specific collection:
+const productIndexes = await monguments.ensureIndexes('products');
+```
+
+#### Automatic Index Deduction
+For any configured collection, Monguments automatically provisions:
+1. **Entity Identifier (`id`)**:
+   - Versionable (`versionable: true`): Compound index `{ [id]: 1, [isLast]: 1 }` for instant retrieval of active versions.
+   - Non-versionable: Unique index `{ [id]: 1 }` (`unique: true`).
+2. **Access Control Owner (`owner`)**:
+   - Versionable: Compound index `{ [owner]: 1, [isLast]: 1 }`.
+   - Non-versionable: Single index `{ [owner]: 1 }`.
+
+#### Declarative Custom Indexes
+Collections can declare additional indexes directly in their schema via the `indexes` array:
+
+```typescript
+const collections: MgCollections = {
+  articles: {
+    id: 'articleId',
+    versionable: true,
+    indexes: [
+      {
+        fields: { slug: 1 },
+        options: { unique: true }
+      },
+      {
+        fields: { categoryId: 1, isLast: 1 }
+      }
+    ]
+  }
+};
 ```
 
 ---

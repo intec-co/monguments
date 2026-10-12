@@ -32,9 +32,16 @@ import {
 ## 2. Initialization
 
 ### Method A: Connect Helper (`mgConnectDb`)
+By default, `mgConnectDb` automatically checks and creates all collection indexes (`ensureIndexes: true`). You can set `ensureIndexes: false` in `conf`, `client`, or `options` to skip index creation on connection:
 ```typescript
 const monguments = await mgConnectDb(
-  { uri: 'mongodb://localhost:27017', db: 'my_db' },
+  { uri: 'mongodb://localhost:27017', db: 'my_db', ensureIndexes: true },
+  { db: 'my_db', collections }
+);
+
+// Skip automatic index creation during connection:
+const mongumentsNoIdx = await mgConnectDb(
+  { uri: 'mongodb://localhost:27017', db: 'my_db', ensureIndexes: false },
   { db: 'my_db', collections }
 );
 ```
@@ -44,6 +51,7 @@ const monguments = await mgConnectDb(
 import { Db } from 'mongodb';
 
 const monguments = new Monguments(db, collections);
+await monguments.ensureIndexes(); // Optional manual execution
 ```
 
 ---
@@ -77,7 +85,21 @@ export interface MgCollectionProperties {
   setClosed?: string[] | '*';         // Allowed fields for 'set' when document is closed
   required?: string[];                // Required fields during 'write' operations
   workflow?: MgWorkflowConfig;        // Document state machine configuration
+  indexes?: MgIndexDefinition[];      // Declarative custom indexes configuration
   properties: MgNameDocProperties;    // Internal property names mapping
+}
+
+export interface MgIndexOptions {
+  unique?: boolean;
+  sparse?: boolean;
+  name?: string;
+  partialFilterExpression?: Record<string, any>;
+  expireAfterSeconds?: number;
+}
+
+export interface MgIndexDefinition {
+  fields: Record<string, number | string>;
+  options?: MgIndexOptions;
 }
 
 export interface MgStateTransition {
@@ -176,9 +198,14 @@ Permissions strings are strictly **2 characters**: `"<ReadScope><WriteScope>"`
 #### Automatic Owner Injection
 When a collection configures an `owner` property:
 1. **Owner-Scoped Read (`'r'`)**: On `read`, `readList`, and `count`, if the request omits the owner field in `req.data`, Monguments automatically injects `req.data[conf.owner] = req.user`.
-2. **Owner-Scoped Write/Set (`'w'` / `'s'`)**: On `set`, if `request.data.query` omits the owner field, it automatically injects `query[conf.owner] = request.user`. If provided but mismatched with `request.user`, it returns `'No tiene permisos para esta operación'`.
+2. **Owner-Scoped Write/Mutations (`'w'` / `'s'`)**:
+   - On **`set`** and **`add`**: If `request.data.query` omits the owner field, it automatically injects `query[conf.owner] = request.user`. If provided but mismatched with `request.user`, it returns `'No tiene permisos para esta operación'`.
+   - On **`close`**: If `request.data` omits the owner field, it automatically injects `request.data[conf.owner] = request.user`. If mismatched, it returns error and restricts the closure query by `owner`.
 3. **Missing Owner Config**: If an operation is invoked with an owner-scoped permission (`'r'`, `'w'`, `'s'`) but the collection does not have `owner` configured, the operation is rejected immediately with `'No tiene permisos para esta operación'`.
 4. **Global Scope (`'R'`, `'W'`)**: Admin permissions bypass owner injection and match across all documents.
+5. **NoSQL Defense in `link.query`**: Conditions beyond the foreign field in `singleLink.query` (`extraConditions`) are strictly validated against `validateQueryFilter`. Disallowed operators (`$where`, `$function`), ReDoS patterns, or prototype keys immediately drop the link.
+6. **Projection Preservation**: Inclusive projections (`params.project`) automatically preserve linked fields (`params.project[link.to] = 1`), preventing MongoDB's pipeline from pruning joined relational data.
+7. **BSON 16 MB Overflow Control (`asArray: true`)**: When retrieving relational links as arrays, lookups are automatically transformed into pipeline lookups with pagination and an enforced safety limit ceiling (`maxLimit || 1000`). Custom `limit` (capped by `maxLimit`), `skip`, and `sort` options in `MgLink` are supported to prevent unbounded arrays from exceeding the BSON document size limit.
 
 ---
 
@@ -244,6 +271,16 @@ const request: MgRequestRead = {
         to: 'profile',
         query: '{"uid":from, "active":true}', // Relational mapping: maps 'from' to foreign 'uid' attribute with extra filters
         asArray: false
+      },
+      {
+        collection: 'comments',
+        from: 'docId',
+        to: 'recentComments',
+        query: '{"targetDoc":from}',
+        asArray: true,
+        sort: { _date: -1 },
+        skip: 0,
+        limit: 25 // Auto-capped by target collection maxLimit (default 1000)
       }
     ]
   }
@@ -337,6 +374,17 @@ const rawCollection = monguments.getCollection('documents');
 
 // Increment auto-counter for a collection
 const counter = await monguments.getCounter('documents');
+```
+
+#### 8. Index Management (`monguments.ensureIndexes`)
+Idempotently ensures automatic (`id`, `owner`, `isLast`) and declarative (`conf.indexes`) indexes. Executed automatically on connection by `mgConnectDb` unless `ensureIndexes: false` is specified:
+```typescript
+// Ensure indexes for all configured collections
+const report = await monguments.ensureIndexes();
+// Returns: { documents: ['docId_1_isLast_1', 'owner_1_isLast_1'], users: ['userId_1'] }
+
+// Ensure indexes for a specific collection
+const docIndexes = await monguments.ensureIndexes('documents');
 ```
 
 ---

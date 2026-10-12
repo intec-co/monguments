@@ -23,6 +23,19 @@ export const mgWorkflowConfigSchema = z.object({
 	versionOnTransition: z.boolean().optional()
 });
 
+export const mgIndexOptionsSchema = z.object({
+	unique: z.boolean().optional(),
+	sparse: z.boolean().optional(),
+	name: z.string().optional(),
+	partialFilterExpression: z.record(z.string(), z.any()).optional(),
+	expireAfterSeconds: z.number().optional()
+});
+
+export const mgIndexDefinitionSchema = z.object({
+	fields: z.record(z.string(), z.union([z.number(), z.string()])),
+	options: mgIndexOptionsSchema.optional()
+});
+
 export const mgCollectionPropertiesSchema = z.object({
 	add: z.union([z.array(z.string()), z.literal('*')]).optional(),
 	addClosed: z.union([z.array(z.string()), z.literal('*')]).optional(),
@@ -45,7 +58,8 @@ export const mgCollectionPropertiesSchema = z.object({
 	maxLimit: z.number().optional(),
 	workflow: mgWorkflowConfigSchema.optional(),
 	regex: z.union([z.array(z.string()), z.literal('*')]).optional(),
-	regexFullSearch: z.boolean().optional()
+	regexFullSearch: z.boolean().optional(),
+	indexes: z.array(mgIndexDefinitionSchema).optional()
 });
 
 export const mgCollectionsSchema = z.record(z.string(), mgCollectionPropertiesSchema);

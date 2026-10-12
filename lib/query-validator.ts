@@ -516,3 +516,19 @@ export const validateRequest = (request: any, conf?: MgCollectionProperties): Va
 export const checkData = (data: any): boolean => {
 	return validateDocumentData(data).valid;
 };
+
+/**
+ * Evaluates whether a projection object uses inclusion semantics (e.g. { field: 1 }).
+ */
+export const isInclusiveProjection = (project: any): boolean => {
+	if (!project || typeof project !== 'object' || Array.isArray(project)) {
+		return false;
+	}
+	for (const [key, val] of Object.entries(project)) {
+		if (key === '_id') continue;
+		if (val === 1 || val === true || (typeof val === 'object' && val !== null)) {
+			return true;
+		}
+	}
+	return false;
+};

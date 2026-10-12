@@ -333,6 +333,7 @@ describe('DocsRead', () => {
 						let: { fromVal: '$linkedId' },
 						pipeline: [
 							{ $match: { $expr: { $eq: ['$linkedId', '$$fromVal'] }, last: true } },
+							{ $limit: 1000 },
 							{ $project: { title: 1, _id: 0 } }
 						],
 						as: 'linkedData'
@@ -340,6 +341,48 @@ describe('DocsRead', () => {
 				}
 			]);
 			expect(result).toEqual({ data: mockDocWithLinkedArray });
+		});
+
+		it('should support custom sort, skip, and limit on asArray link', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'user1', link: { linkedColl: true } };
+				if (collName === 'linkedColl') return { id: 'linkedId', versionable: true, properties: { isLast: 'last' }, maxLimit: 500 };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				link: [{
+					collection: 'linkedColl',
+					from: 'linkedId',
+					to: 'linkedData',
+					asArray: true,
+					sort: { createdAt: -1 },
+					skip: 15,
+					limit: 50
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 1 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params!.lookup).toEqual([
+				{
+					$lookup: {
+						from: 'linkedColl',
+						let: { fromVal: '$linkedId' },
+						pipeline: [
+							{ $match: { $expr: { $eq: ['$linkedId', '$$fromVal'] }, last: true } },
+							{ $sort: { createdAt: -1 } },
+							{ $skip: 15 },
+							{ $limit: 50 }
+						],
+						as: 'linkedData'
+					}
+				}
+			]);
 		});
 
 		it('should append lookup stages when req.params.lookup is already an array or single stage', async () => {
@@ -516,8 +559,11 @@ describe('DocsRead', () => {
 				{
 					$lookup: {
 						from: 'linkedColl',
-						localField: 'linkedId',
-						foreignField: 'linkedId',
+						let: { fromVal: '$linkedId' },
+						pipeline: [
+							{ $match: { $expr: { $eq: ['$linkedId', '$$fromVal'] } } },
+							{ $limit: 1000 }
+						],
 						as: 'linkedData'
 					}
 				}
@@ -691,6 +737,63 @@ describe('DocsRead', () => {
 			const lookupStage = (mockReq.params!.lookup as any)[0].$lookup;
 			expect(lookupStage.from).toBe('paperwork');
 			expect(lookupStage.as).toBe('paperwork');
+		});
+
+		it('should discard link when extraConditions in query contain disallowed operators', async () => {
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'id', link: { paperwork: true } };
+				if (collName === 'paperwork') return { id: 'pw', owner: 'id', versionable: true, properties: { isLast: 'isLast' } };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				link: [{
+					collection: 'paperwork',
+					from: 'id',
+					to: 'paperwork',
+					asArray: true,
+					query: '{"id":from, "$where":"sleep(5000)"}'
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 79268 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params?.lookup).toBeUndefined();
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid extraConditions in link query'));
+			consoleSpy.mockRestore();
+		});
+
+		it('should preserve linked field in params.project when project uses inclusion semantics', async () => {
+			mockMongo.getCollectionProperties.mockImplementation((collName: string) => {
+				if (collName === 'testColl') return { owner: 'id', link: { paperwork: true } };
+				if (collName === 'paperwork') return { id: 'pw', owner: 'id', versionable: false, properties: {} };
+				return undefined;
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			mockReq.params = {
+				project: { name: 1, docId: 1 },
+				link: [{
+					collection: 'paperwork',
+					from: 'id',
+					to: 'paperwork',
+					asArray: true,
+					query: '{"id":from}'
+				}]
+			} as any;
+
+			const mockCursor = { next: vi.fn().mockResolvedValue({ id: 79268 }) };
+			(read as Mock).mockReturnValue(mockCursor);
+
+			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--');
+
+			expect(mockReq.params?.project).toBeDefined();
+			expect(mockReq.params!.project.paperwork).toBe(1);
 		});
 	});
 });

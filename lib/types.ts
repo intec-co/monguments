@@ -44,6 +44,20 @@ export type MgCollectionProperties = {
 	workflow?: MgWorkflowConfig;
 	regex?: Array<string> | '*';
 	regexFullSearch?: boolean;
+	indexes?: Array<MgIndexDefinition>;
+}
+
+export type MgIndexOptions = {
+	unique?: boolean;
+	sparse?: boolean;
+	name?: string;
+	partialFilterExpression?: Record<string, any>;
+	expireAfterSeconds?: number;
+}
+
+export type MgIndexDefinition = {
+	fields: Record<string, number | string>;
+	options?: MgIndexOptions;
 }
 
 export type MgCollections = { [key: string]: MgCollectionProperties; }
@@ -65,6 +79,7 @@ export type MgW = {
 export type MgClient = {
 	collections: any;
 	db: string;
+	ensureIndexes?: boolean;
 }
 export type MgResult = {
 	data?: any;
@@ -77,6 +92,10 @@ export type MgResponse = {
 export type MgConf = {
 	uri: string;
 	db: string;
+	ensureIndexes?: boolean;
+}
+export type MgConnectOptions = {
+	ensureIndexes?: boolean;
 }
 export type MgRequest = {
 	data: any;
@@ -107,6 +126,9 @@ export type MgLink = {
 	query?: string;
 	to: string;
 	asArray?: boolean;
+	limit?: number;
+	skip?: number;
+	sort?: any;
 }
 
 export type MongoLookup = {

@@ -120,6 +120,27 @@ export const docProcess = async (
 			collProperties = link.getCollectionProperties(collection);
 			if (collProperties) {
 				owner = collProperties.owner;
+				if (permission === 'w') {
+					if (!owner) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+					if (!request.data) {
+						request.data = {};
+					}
+					if (!request.data.query) {
+						request.data.query = {};
+					}
+					if (request.data.query[owner] === undefined) {
+						request.data.query[owner] = request.user;
+					} else if (request.data.query[owner] !== request.user) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+					if (request.data[owner] === undefined) {
+						request.data[owner] = request.user;
+					} else if (request.data[owner] !== request.user) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+				}
 				if (hasPermission(permission, owner, request)) {
 					return add(link, collection, request);
 				} else {
@@ -133,6 +154,19 @@ export const docProcess = async (
 			collProperties = link.getCollectionProperties(collection);
 			if (collProperties) {
 				owner = collProperties.owner;
+				if (permission === 'w') {
+					if (!owner) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+					if (!request.data) {
+						request.data = {};
+					}
+					if (request.data[owner] === undefined) {
+						request.data[owner] = request.user;
+					} else if (request.data[owner] !== request.user) {
+						return { response: { error: 'No tiene permisos para esta operación' } };
+					}
+				}
 				if (hasPermission(permission, owner, request)) {
 					return close(link, collection, request);
 				} else {
