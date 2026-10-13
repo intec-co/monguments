@@ -99,12 +99,9 @@ describe('Zod Validation Unit Tests', () => {
 				user: 123
 			};
 
-			const invalidAdvancedPermissions: any = [
-				{
-					operation: 'write'
-					// value is missing
-				}
-			];
+			const invalidAdvancedPermissions: any = {
+				write: 'user1' // must be an array of strings
+			};
 
 			const result = await docProcess(mockLink, 'users', validRequest, 'W', invalidAdvancedPermissions);
 			expect(result.response?.error).toBeDefined();
@@ -118,12 +115,9 @@ describe('Zod Validation Unit Tests', () => {
 				user: 123
 			};
 
-			const validAdvancedPermissions: any = [
-				{
-					operation: 'write',
-					value: ['user1']
-				}
-			];
+			const validAdvancedPermissions: any = {
+				write: ['user1']
+			};
 
 			const result = await docProcess(mockLink, 'users', validRequest, 'W', validAdvancedPermissions);
 			expect(result.response?.error).not.toContain('Invalid request');

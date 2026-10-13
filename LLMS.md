@@ -245,14 +245,14 @@ const request: MgRequest = {
 };
 
 // Advanced permissions for field projections or transitions
-const advancedPermissions: AdvancedPermission[] = [
-  { operation: 'read', value: ['title', 'parent.children'] }
-];
+const advancedPermissions: AdvancedPermission = {
+  read: ['title', 'parent.children']
+};
 
 const result: MgResult = await monguments.process('documents', request, 'rw', advancedPermissions);
 // Result structure: { data: ..., response: { msg: 'ok', error?: string } }
 ```
-- **Read field projections**: When `operation` is `'read'` (or `'readList'`), `value` projects only the specified document fields (including nested dot-notation fields such as `'parent.children'`). By default (if `value` is empty `[]`, `['*']`, or omitted), all document fields are returned.
+- **Read field projections**: `advancedPermissions.read` specifies allowed document fields to project (`project`), with support for dot notation (e.g. `'parent.children'`). It applies to both `read` and `readList`. By default (if empty `[]`, containing `['*']`, or omitted), all document fields are returned according to the collection configuration.
 
 
 ---
@@ -260,8 +260,9 @@ const result: MgResult = await monguments.process('documents', request, 'rw', ad
 ### Core Direct Operations
 
 #### 1. Read (`monguments.read`)
+Retrieves documents matching a query filter. Optionally accepts `permissions` (SARA 2-character permissions) and `advancedPermissions` (`{ read: string[] }`) to project specific fields (`project`).
 ```typescript
-import { MgRequestRead, FindCursor, AggregationCursor } from 'monguments';
+import { MgRequestRead, AdvancedPermission, FindCursor, AggregationCursor } from 'monguments';
 
 const request: MgRequestRead = {
   data: { status: 'published' },
@@ -360,7 +361,7 @@ const result: MgResult = await monguments.close('documents', request);
 ```
 
 #### 6. Transition (`monguments.transition`)
-Executes document state transitions enforced by workflow rules. Validates target state, role authorization, and required payload fields.
+Executes document state transitions enforced by workflow rules. `advancedPermissions` (`{ transition: string[] }`) is used to validate which actions or roles the user is authorized to perform (`allowedActions`). If the rule requires specific actions and the caller does not supply matching values in `transition`, the transition is rejected.
 ```typescript
 import { AdvancedPermission } from 'monguments';
 
@@ -372,9 +373,9 @@ const request: MgRequest = {
   data: { notes: 'Approved' }
 };
 
-const advancedPermissions: AdvancedPermission[] = [
-  { operation: 'transition', value: ['editor', 'admin'] }
-];
+const advancedPermissions: AdvancedPermission = {
+  transition: ['editor', 'admin']
+};
 const result: MgResult = await monguments.transition('documents', request, advancedPermissions);
 ```
 

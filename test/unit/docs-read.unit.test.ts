@@ -194,9 +194,7 @@ describe('DocsRead', () => {
 			(read as Mock).mockReturnValue(mockCursor);
 
 			mockReq.params = undefined as any;
-			const advancedPermissions = [
-				{ operation: 'read', value: ['name', 'parent.children', 'profile.address.city'] }
-			];
+			const advancedPermissions = { read: ['name', 'parent.children', 'profile.address.city'] };
 
 			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
 
@@ -215,9 +213,7 @@ describe('DocsRead', () => {
 			(read as Mock).mockReturnValue(mockCursor);
 
 			mockReq.params = undefined as any;
-			const advancedPermissions = [
-				{ operation: 'read', value: ['parent.children'] }
-			];
+			const advancedPermissions = { read: ['parent.children'] };
 
 			await readDoc(mockMongo as any, 'testColl', mockReq, 'r-0', advancedPermissions);
 
@@ -234,9 +230,7 @@ describe('DocsRead', () => {
 			(read as Mock).mockReturnValue(mockCursor);
 
 			mockReq.params = undefined as any;
-			const advancedPermissions = [
-				{ operation: 'read', value: [] }
-			];
+			const advancedPermissions = { read: [] };
 
 			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
 
@@ -251,9 +245,7 @@ describe('DocsRead', () => {
 			(read as Mock).mockReturnValue(mockCursor);
 
 			mockReq.params = undefined as any;
-			const advancedPermissions = [
-				{ operation: 'read', value: ['*'] }
-			];
+			const advancedPermissions = { read: ['*'] };
 
 			await readDoc(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
 
@@ -268,9 +260,7 @@ describe('DocsRead', () => {
 			(read as Mock).mockReturnValue(mockCursor);
 
 			mockReq.params = undefined as any;
-			const advancedPermissions = [
-				{ operation: 'readList', value: ['parent.children', 'title'] }
-			];
+			const advancedPermissions = { read: ['parent.children', 'title'] };
 
 			await readList(mockMongo as any, 'testColl', mockReq, 'r--', advancedPermissions);
 

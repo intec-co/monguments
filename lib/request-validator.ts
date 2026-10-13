@@ -1,4 +1,4 @@
-import { AdvancedPermission, MgRequest } from './types';
+import { ADVANCED_PERMISSION_KEYS, MgRequest } from './types';
 
 /**
  * Validates the runtime structure and field types of an incoming MgRequest.
@@ -33,27 +33,24 @@ export function validateMgRequest(request: unknown): string | null {
 }
 
 /**
- * Validates the runtime structure of the optional AdvancedPermission array.
+ * Validates the runtime structure of the optional AdvancedPermission object.
  * Returns an error message string if invalid, or null if valid.
  */
 export function validateAdvancedPermissions(advancedPermissions: unknown): string | null {
-	if (!Array.isArray(advancedPermissions)) {
-		return 'Invalid advancedPermissions: Expected array';
+	if (!advancedPermissions || typeof advancedPermissions !== 'object' || Array.isArray(advancedPermissions)) {
+		return 'Invalid advancedPermissions: Expected object';
 	}
 
-	for (let i = 0; i < advancedPermissions.length; i++) {
-		const item = advancedPermissions[i];
-		if (!item || typeof item !== 'object' || Array.isArray(item)) {
-			return `Invalid advancedPermissions: [${i}]: Expected object`;
+	const allowed: readonly string[] = ADVANCED_PERMISSION_KEYS;
+	for (const [key, value] of Object.entries(advancedPermissions as Record<string, unknown>)) {
+		if (!allowed.includes(key)) {
+			return `Invalid advancedPermissions: unknown key '${key}'`;
 		}
-
-		const perm = item as Partial<AdvancedPermission>;
-		if (typeof perm.operation !== 'string') {
-			return `Invalid advancedPermissions: [${i}].operation: Expected string`;
+		if (value === undefined) {
+			continue;
 		}
-
-		if (!Array.isArray(perm.value) || !perm.value.every((v) => typeof v === 'string')) {
-			return `Invalid advancedPermissions: [${i}].value: Expected array of strings`;
+		if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+			return `Invalid advancedPermissions: ${key}: Expected array of strings`;
 		}
 	}
 

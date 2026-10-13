@@ -31,11 +31,11 @@ export interface Monguments {
 	getCollectionId(collection: string): string;
 	getCollectionProperties(collection: string): MgCollectionProperties | undefined;
 	getCounter(collection: string): Promise<any>;
-	process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]): Promise<MgResult>;
+	process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission): Promise<MgResult>;
 	read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined;
 	set(collection: string, request: MgRequest): Promise<MgResult>;
 	setLogger(logger?: MgLogger): void;
-	transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission[]): Promise<MgResult>;
+	transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission): Promise<MgResult>;
 	write(collection: string, request: MgRequest): Promise<MgResult>;
 }
 
@@ -146,7 +146,7 @@ export function createMonguments(db: Db, collections: MgCollections, client?: Mo
 			);
 			return doc;
 		},
-		async process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]): Promise<MgResult> {
+		async process(collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission): Promise<MgResult> {
 			return docProcess(link, collection, request, permissions, advancedPermissions);
 		},
 		read(collection: string, request: MgRequestRead): FindCursor | AggregationCursor | undefined {
@@ -158,7 +158,7 @@ export function createMonguments(db: Db, collections: MgCollections, client?: Mo
 		setLogger(nextLogger?: MgLogger): void {
 			link.setLogger?.(nextLogger);
 		},
-		async transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission[]): Promise<MgResult> {
+		async transition(collection: string, request: MgRequest, advancedPermissions?: AdvancedPermission): Promise<MgResult> {
 			return transition(link, collection, request, advancedPermissions);
 		},
 		async write(collection: string, request: MgRequest): Promise<MgResult> {

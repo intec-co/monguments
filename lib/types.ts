@@ -174,7 +174,20 @@ export type MongoLookupPipeLine = {
 
 export type MgCallback = (data: any, result?: MgResponse) => void;
 
+/**
+ * Per-operation advanced permissions. Each key is optional and holds a list of strings:
+ * - `read`: allowed projection fields for `read` and `readList` (`[]` or `['*']` = unrestricted).
+ * - `transition`: allowed actions/roles for state transitions.
+ * - `write`, `set`, `add`, `close`, `count`: reserved (declarative, not yet enforced by the engine).
+ */
 export type AdvancedPermission = {
-	operation: string;
-	value: string[];
+	read?: string[];
+	write?: string[];
+	set?: string[];
+	add?: string[];
+	close?: string[];
+	transition?: string[];
+	count?: string[];
 }
+
+export const ADVANCED_PERMISSION_KEYS = ['read', 'write', 'set', 'add', 'close', 'transition', 'count'] as const;

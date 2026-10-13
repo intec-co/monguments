@@ -65,12 +65,7 @@ describe('AdvancedPermission Read Projection E2E', () => {
 				user: 0
 			};
 
-			const advancedPermissions: AdvancedPermission[] = [
-				{
-					operation: 'read',
-					value: ['title', 'parent.children']
-				}
-			];
+			const advancedPermissions: AdvancedPermission = { read: ['title', 'parent.children'] };
 
 			const res = await mg.process('basicIdManual', req, 'RW_', advancedPermissions);
 
@@ -89,12 +84,7 @@ describe('AdvancedPermission Read Projection E2E', () => {
 				user: 0
 			};
 
-			const advancedPermissions: AdvancedPermission[] = [
-				{
-					operation: 'read',
-					value: []
-				}
-			];
+			const advancedPermissions: AdvancedPermission = { read: [] };
 
 			const res = await mg.process('basicIdManual', req, 'RW_', advancedPermissions);
 
@@ -138,12 +128,7 @@ describe('AdvancedPermission Read Projection E2E', () => {
 				user: 0
 			};
 
-			const advancedPermissions: AdvancedPermission[] = [
-				{
-					operation: 'read',
-					value: ['parent.children']
-				}
-			];
+			const advancedPermissions: AdvancedPermission = { read: ['parent.children'] };
 
 			const res = await mg.process('basicIdManual', req, 'RW_', advancedPermissions);
 
@@ -162,19 +147,14 @@ describe('AdvancedPermission Read Projection E2E', () => {
 			expect(res.data[1].secretField).toBeUndefined();
 		});
 
-		it('should support advancedPermissions specifying operation readList explicitly', async () => {
+		it('should apply advancedPermissions.read to operation readList', async () => {
 			const req: MgRequest = {
 				data: { _id: { $in: [101, 102] } },
 				operation: 'readList',
 				user: 0
 			};
 
-			const advancedPermissions: AdvancedPermission[] = [
-				{
-					operation: 'readList',
-					value: ['title', 'metadata.views']
-				}
-			];
+			const advancedPermissions: AdvancedPermission = { read: ['title', 'metadata.views'] };
 
 			const res = await mg.process('basicIdManual', req, 'RW_', advancedPermissions);
 

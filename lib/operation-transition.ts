@@ -67,9 +67,9 @@ export async function transition(
 	mongo: Link,
 	collection: string,
 	request: MgRequest,
-	advancedPermissions?: AdvancedPermission[]
+	advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> {
-	const allowedActions = advancedPermissions?.find((ap) => ap.operation === 'transition')?.value;
+	const allowedActions = advancedPermissions?.transition;
 	if (!request.data || !request.query) {
 		if (request.data && request.data.query) {
 			request.query = request.data.query;

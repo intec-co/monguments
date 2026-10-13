@@ -273,9 +273,9 @@ const request: MgRequest = {
 };
 
 // Optional: specify field projections (supports dot notation, e.g. 'parent.child')
-const advancedPermissions: AdvancedPermission[] = [
-  { operation: 'read', value: ['title', 'price', 'category.name'] }
-];
+const advancedPermissions: AdvancedPermission = {
+  read: ['title', 'price', 'category.name']
+};
 
 const result = await monguments.process('articles', request, 'rw', advancedPermissions);
 // Returns: { data: [ ...projectedDocs ], response: { msg: 'ok' } }
@@ -289,8 +289,11 @@ Supported `operation` values: `'read'`, `'readList'`, `'write'`, `'set'`, `'add'
 
 Fetches documents matching a query filter. Automatically injects `_isLast: true` for versioned collections.
 
+> [!NOTE]
+> **Field Projections with `advancedPermissions`**: The optional `advancedPermissions` argument (`{ read: string[] }`) specifies which document fields to project (`project`), with full support for dot notation (e.g. `'parent.children'`). If omitted, passed as empty `[]`, or supplied with a wildcard `['*']`, all document fields are projected according to the collection configuration.
+
 ```typescript
-import { MgRequestRead } from 'monguments';
+import { MgRequestRead, AdvancedPermission } from 'monguments';
 
 const request: MgRequestRead = {
   data: { status: 'active' },
@@ -301,8 +304,13 @@ const request: MgRequestRead = {
   }
 };
 
+// Explicit field projection using advancedPermissions
+const advancedPermissions: AdvancedPermission = {
+  read: ['title', 'price', 'category.name']
+};
+
 // Returns a MongoDB FindCursor or AggregationCursor
-const cursor = monguments.read('articles', request);
+const cursor = monguments.read('articles', request, 'rw', advancedPermissions);
 const docs = await cursor.toArray();
 ```
 
@@ -400,6 +408,9 @@ const result = await monguments.close('articles', request);
 
 Executes document state transitions enforced by rules defined in `MgCollectionProperties.workflow`. Checks current state, transition permissions, required fields, and auto-closes terminal states.
 
+> [!NOTE]
+> **Action Validation with `advancedPermissions`**: In workflow transition operations, `advancedPermissions` (`{ transition: string[] }`) is used to validate which transition actions or roles the user is authorized to perform (`allowedActions`). If a workflow rule defines required actions and the caller does not supply matching values in `advancedPermissions.transition`, the transition is rejected (`'Acción no autorizada para realizar esta transición'`).
+
 ```typescript
 import { MgRequest, AdvancedPermission } from 'monguments';
 
@@ -412,9 +423,9 @@ const request: MgRequest = {
 };
 
 // Supply authorized actions matching rule.allowedActions
-const advancedPermissions: AdvancedPermission[] = [
-  { operation: 'transition', value: ['editor', 'admin'] }
-];
+const advancedPermissions: AdvancedPermission = {
+  transition: ['editor', 'admin']
+};
 
 const result = await monguments.transition('articles', request, advancedPermissions);
 ```
@@ -675,7 +686,7 @@ When instantiating `Monguments` or `mgConnectDb()`, the `collections` map is val
 ### 2. Fast Request & Permission Validation
 Every operation routed through `process()` is validated using zero-dependency native validators:
 - `validateMgRequest`: Verifies `user` (number/string), optional `ips` (string array), valid `operation` string, and payload parameters.
-- `validateAdvancedPermissions`: Validates structured permission definitions (`operation: string`, `value: string[]`).
+- `validateAdvancedPermissions`: Validates structured per-operation permission objects (`{ read?: string[], write?: string[], set?: string[], add?: string[], close?: string[], transition?: string[], count?: string[] }`).
 - Returns structured error responses (`{ data: null, response: { error: 'Invalid request: ...' } }` or `{ data: null, response: { error: 'Invalid advancedPermissions: ...' } }`) on validation failure before querying MongoDB.
 
 ---

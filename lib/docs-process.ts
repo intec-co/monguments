@@ -16,7 +16,7 @@ const check = (
 	collection: string,
 	request: MgRequest,
 	permissions: string,
-	advancedPermissions?: AdvancedPermission[]
+	advancedPermissions?: AdvancedPermission
 ): string | null => {
 	const msg = 'is undefined';
 	if (!request) {
@@ -65,7 +65,7 @@ const check = (
 };
 
 export const docProcess = async (
-	link: Link, collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission[]
+	link: Link, collection: string, request: MgRequest, permissions: string, advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> => {
 	const opName = request?.operation || 'process';
 	const userId = request?.user;

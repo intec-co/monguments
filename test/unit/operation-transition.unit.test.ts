@@ -158,7 +158,7 @@ describe('OperationTransition Unit', () => {
 					data: { targetState: 'published' },
 					query: { id: 1 }
 				},
-				[{ operation: 'transition', value: ['editor'] }]
+				{ transition: ['editor'] }
 			);
 
 			expect(mockCollection.updateOne).toHaveBeenCalled();

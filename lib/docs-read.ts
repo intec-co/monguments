@@ -240,7 +240,7 @@ function checkRequest(
 	collection: string,
 	req: MgRequest,
 	permissions: string,
-	advancedPermissions?: AdvancedPermission[]
+	advancedPermissions?: AdvancedPermission
 ): string {
 	const permission = permissions.charAt(0);
 	const collectionConf = mongo.getCollectionProperties(collection);
@@ -263,13 +263,12 @@ function checkRequest(
 		return 'No tiene permisos para esta operación';
 	}
 
-	const readAdv = advancedPermissions?.find((ap) => ap.operation === req.operation) ||
-		advancedPermissions?.find((ap) => ap.operation === 'read');
+	const readAdv = advancedPermissions?.read;
 
 	if (readAdv) {
-		if (Array.isArray(readAdv.value) && readAdv.value.length > 0 && !readAdv.value.includes('*')) {
+		if (Array.isArray(readAdv) && readAdv.length > 0 && !readAdv.includes('*')) {
 			const project: Record<string, number> = {};
-			for (const field of readAdv.value) {
+			for (const field of readAdv) {
 				if (typeof field === 'string' && field.trim().length > 0) {
 					project[field.trim()] = 1;
 				}
@@ -296,7 +295,7 @@ export async function readDoc(
 	collection: string,
 	req: MgRequest,
 	permissions: string,
-	advancedPermissions?: AdvancedPermission[]
+	advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> {
 	req.operation = 'read';
 	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);
@@ -321,7 +320,7 @@ export async function readList(
 	collection: string,
 	req: MgRequest,
 	permissions: string,
-	advancedPermissions?: AdvancedPermission[]
+	advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> {
 	req.operation = 'readList';
 	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);

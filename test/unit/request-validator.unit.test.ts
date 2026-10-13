@@ -52,47 +52,49 @@ describe('Request Validator Unit Tests', () => {
 	});
 
 	describe('validateAdvancedPermissions', () => {
-		it('should return null for empty array or valid permission entries', () => {
-			expect(validateAdvancedPermissions([])).toBeNull();
+		it('should return null for empty object or valid permission keys', () => {
+			expect(validateAdvancedPermissions({})).toBeNull();
 			expect(
-				validateAdvancedPermissions([
-					{ operation: 'write', value: ['user1', 'user2'] },
-					{ operation: 'read', value: [] }
-				])
+				validateAdvancedPermissions({
+					read: ['title'],
+					write: ['user1', 'user2'],
+					set: ['status'],
+					add: ['items'],
+					close: ['admin'],
+					transition: ['editor'],
+					count: []
+				})
 			).toBeNull();
+			expect(validateAdvancedPermissions({ read: undefined })).toBeNull();
 		});
 
-		it('should return error when input is not an array', () => {
-			expect(validateAdvancedPermissions(null)).toBe('Invalid advancedPermissions: Expected array');
-			expect(validateAdvancedPermissions(undefined)).toBe('Invalid advancedPermissions: Expected array');
-			expect(validateAdvancedPermissions('perm')).toBe('Invalid advancedPermissions: Expected array');
-			expect(validateAdvancedPermissions({})).toBe('Invalid advancedPermissions: Expected array');
-		});
-
-		it('should return error when array element is not an object', () => {
-			expect(validateAdvancedPermissions([null])).toBe('Invalid advancedPermissions: [0]: Expected object');
-			expect(validateAdvancedPermissions(['write'])).toBe('Invalid advancedPermissions: [0]: Expected object');
-			expect(validateAdvancedPermissions([[]])).toBe('Invalid advancedPermissions: [0]: Expected object');
-		});
-
-		it('should return error when operation is missing or not a string', () => {
-			expect(validateAdvancedPermissions([{ value: ['u1'] }])).toBe(
-				'Invalid advancedPermissions: [0].operation: Expected string'
-			);
-			expect(validateAdvancedPermissions([{ operation: 123, value: ['u1'] }])).toBe(
-				'Invalid advancedPermissions: [0].operation: Expected string'
+		it('should return error when input is not a plain object', () => {
+			expect(validateAdvancedPermissions(null)).toBe('Invalid advancedPermissions: Expected object');
+			expect(validateAdvancedPermissions(undefined)).toBe('Invalid advancedPermissions: Expected object');
+			expect(validateAdvancedPermissions('perm')).toBe('Invalid advancedPermissions: Expected object');
+			expect(validateAdvancedPermissions([])).toBe('Invalid advancedPermissions: Expected object');
+			expect(validateAdvancedPermissions([{ operation: 'read', value: [] }])).toBe(
+				'Invalid advancedPermissions: Expected object'
 			);
 		});
 
-		it('should return error when value is missing or not an array of strings', () => {
-			expect(validateAdvancedPermissions([{ operation: 'write' }])).toBe(
-				'Invalid advancedPermissions: [0].value: Expected array of strings'
+		it('should return error on unknown keys', () => {
+			expect(validateAdvancedPermissions({ delete: ['x'] })).toBe("Invalid advancedPermissions: unknown key 'delete'");
+			expect(validateAdvancedPermissions({ readList: ['x'] })).toBe("Invalid advancedPermissions: unknown key 'readList'");
+			expect(validateAdvancedPermissions({ operation: 'read', value: [] })).toBe(
+				"Invalid advancedPermissions: unknown key 'operation'"
 			);
-			expect(validateAdvancedPermissions([{ operation: 'write', value: 'u1' }])).toBe(
-				'Invalid advancedPermissions: [0].value: Expected array of strings'
+		});
+
+		it('should return error when a value is not an array of strings', () => {
+			expect(validateAdvancedPermissions({ write: 'u1' })).toBe(
+				'Invalid advancedPermissions: write: Expected array of strings'
 			);
-			expect(validateAdvancedPermissions([{ operation: 'write', value: [123] }])).toBe(
-				'Invalid advancedPermissions: [0].value: Expected array of strings'
+			expect(validateAdvancedPermissions({ read: [123] })).toBe(
+				'Invalid advancedPermissions: read: Expected array of strings'
+			);
+			expect(validateAdvancedPermissions({ transition: null })).toBe(
+				'Invalid advancedPermissions: transition: Expected array of strings'
 			);
 		});
 	});

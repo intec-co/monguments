@@ -41,8 +41,13 @@ export type MgWorkflowConfig = {
 };
 
 export type AdvancedPermission = {
-  operation: string;                // 'transition', 'read', etc.
-  value: string[];                  // Allowed action names or projected fields
+  read?: string[];
+  write?: string[];
+  set?: string[];
+  add?: string[];
+  close?: string[];
+  transition?: string[];
+  count?: string[];
 };
 ```
 
@@ -117,9 +122,9 @@ const request: MgRequest = {
   }
 };
 
-const advancedPermissions: AdvancedPermission[] = [
-  { operation: 'transition', value: ['editor'] }
-];
+const advancedPermissions: AdvancedPermission = {
+  transition: ['editor']
+};
 
 const result = await monguments.transition('articles', request, advancedPermissions);
 
@@ -262,9 +267,9 @@ async function runWorkflowDemo() {
   });
 
   // 3. Approve document as Manager (Auto-closes document)
-  const managerPerms: AdvancedPermission[] = [
-    { operation: 'transition', value: ['manager'] }
-  ];
+  const managerPerms: AdvancedPermission = {
+    transition: ['manager']
+  };
 
   const approveRes = await monguments.transition(
     'documents',
