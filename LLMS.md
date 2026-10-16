@@ -514,4 +514,16 @@ export type MgLoggerObject = {
 export type MgLogger = MgLoggerFn | MgLoggerObject;
 ```
 
+### Contextual Diagnostic Messages & Root-Cause Taxonomy (`entry.message` & `entry.data`)
+While `MgResult.response.error` preserves backward-compatible API error strings, `MgLogEntry.message` and `MgLogEntry.data` provide rich diagnostic context:
+- **Contextual Prefix**: `[collection: <coll> | op: <op> | user: <user>] <error> — <diagnostic_detail>`
+- **Diagnostic Root Causes (`entry.data.reason`)**:
+  - `user_permission_denied`: Insufficient role permission string (e.g., `'R_'` on `write`, `'rw'` on batch array `write`).
+  - `collection_missing_owner`: User has owner-scoped permission (`'r'`, `'w'`, `'s'`), but the collection configuration in `collections.json` omits `owner`.
+  - `owner_mismatch` / `missing_owner_in_data`: Collection has `owner` configured, but `request.data[owner]` or `request.data.query[owner]` is missing or does not match `request.user`.
+  - `document_closed` vs. `exclusive_owner_mismatch`: Distinguishes `write unfair` caused by `_closed: true` vs. `exclusive: true` creator check (`_w.id !== request.user`).
+  - `fields_not_allowed_in_set` / `fields_not_allowed_in_add`: Logs `requestedFields`, `allowedFields` (`set`/`setClosed` or `add`/`addClosed`), and `documentOpen` when `$set is empty` or `no se puede procesar la solicitud` occurs.
+  - `collection_not_closable` / `missing_id_in_close_query` / `exclusive_close_denied`: Distinguishes why `close` failed.
+  - `missing_id_without_id_auto` / `missing_required_field` / `workflow_transition_rejected`: Schema and workflow transition diagnostics.
+
 

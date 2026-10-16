@@ -3,7 +3,7 @@ import { hasPermission } from './has-permission';
 import { AdvancedPermission, MgCollectionProperties, MgLink, MgRequest, MgResult } from './types';
 import { Link } from './db-link';
 import { isInclusiveProjection, validateQueryFilter } from './query-validator';
-import { logFromLink } from './logger';
+import { errWithDiagnostic, logFromLink } from './logger';
 
 function verifyPermissions(mongo: Link, singleLink: MgLink, collectionConf: MgCollectionProperties, collectionName: string, req: MgRequest): boolean {
 	if (singleLink && singleLink.collection && singleLink.from && singleLink.to) {
@@ -241,16 +241,31 @@ function checkRequest(
 	req: MgRequest,
 	permissions: string,
 	advancedPermissions?: AdvancedPermission
-): string {
+): MgResult | null {
+	const opName = req.operation || 'read';
 	const permission = permissions.charAt(0);
 	const collectionConf = mongo.getCollectionProperties(collection);
 	if (!collectionConf) {
-		return 'Colección no configurada';
+		return errWithDiagnostic(
+			'Colección no configurada',
+			`Collection '${collection}' does not exist in the Monguments collections configuration`,
+			{ reason: 'collection_not_configured', collection, operation: opName }
+		);
 	}
 	const owner = collectionConf.owner;
 	if (permission === 'r') {
 		if (!owner) {
-			return 'No tiene permisos para esta operación';
+			return errWithDiagnostic(
+				'No tiene permisos para esta operación',
+				`Incomplete collection configuration: user has owner-scoped read permission ('r', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
+				{
+					reason: 'collection_missing_owner',
+					collection,
+					operation: opName,
+					permissions,
+					requiredConfig: 'owner'
+				}
+			);
 		}
 		if (!req.data) {
 			req.data = {};
@@ -260,7 +275,32 @@ function checkRequest(
 		}
 	}
 	if (!hasPermission(permission, owner, req)) {
-		return 'No tiene permisos para esta operación';
+		if (permission === 'r' && owner && req.data && req.data[owner] !== req.user) {
+			return errWithDiagnostic(
+				'No tiene permisos para esta operación',
+				`Insufficient user permissions (owner mismatch): permission 'r' only allows querying own documents in collection '${collection}', but field '${owner}' in request (${req.data[owner]}) does not match current user (${req.user})`,
+				{
+					reason: 'owner_mismatch',
+					collection,
+					operation: opName,
+					permissions,
+					ownerField: owner,
+					requestedOwner: req.data[owner],
+					user: req.user
+				}
+			);
+		}
+		return errWithDiagnostic(
+			'No tiene permisos para esta operación',
+			`Insufficient user permissions: '${opName}' operation on collection '${collection}' requires read permission ('r' or 'R'), but user has permissions '${permissions}' (read: '${permission}')`,
+			{
+				reason: 'user_permission_denied',
+				collection,
+				operation: opName,
+				permissions,
+				requiredPermission: 'r|R'
+			}
+		);
 	}
 
 	const readAdv = advancedPermissions?.read;
@@ -287,7 +327,7 @@ function checkRequest(
 		}
 		req.params.project = collectionConf.projections[projectIdx] || collectionConf.projections[0];
 	}
-	return '';
+	return null;
 }
 
 export async function readDoc(
@@ -298,9 +338,9 @@ export async function readDoc(
 	advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> {
 	req.operation = 'read';
-	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);
-	if (error) {
-		return { response: { error } };
+	const errorResult = checkRequest(mongo, collection, req, permissions, advancedPermissions);
+	if (errorResult) {
+		return errorResult;
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {
@@ -323,9 +363,9 @@ export async function readList(
 	advancedPermissions?: AdvancedPermission
 ): Promise<MgResult> {
 	req.operation = 'readList';
-	const error = checkRequest(mongo, collection, req, permissions, advancedPermissions);
-	if (error) {
-		return { response: { error } };
+	const errorResult = checkRequest(mongo, collection, req, permissions, advancedPermissions);
+	if (errorResult) {
+		return errorResult;
 	}
 	prepareLinkLookup(mongo, collection, req);
 	try {

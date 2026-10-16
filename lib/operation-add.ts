@@ -2,7 +2,7 @@ import { Collection } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult } from './types';
 import { validateDocumentData } from './query-validator';
-import { logFromLink } from './logger';
+import { errWithDiagnostic, formatDiagnosticMessage, logFromLink } from './logger';
 
 async function writeAdd(
 	coll: Collection,
@@ -19,6 +19,7 @@ async function writeAdd(
 	const date = new Date().getTime();
 	let properties;
 	const p = conf.properties;
+	const targetColl = collectionName || coll.collectionName;
 
 	const w = {
 		date,
@@ -79,16 +80,28 @@ async function writeAdd(
 		} catch (err) {
 			logFromLink(mongo, {
 				level: 'error',
-				collection: collectionName || coll.collectionName,
+				collection: targetColl,
 				operation: 'add',
 				user: request.user,
-				message: 'ha ocurrido un error (error mongo.add document)',
+				message: formatDiagnosticMessage(targetColl, 'add', request.user, 'An internal database error occurred (error mongo.add document)'),
 				err
 			});
 			return { response: { error: 'ha ocurrido un error', msg: 'error mongo.add document' } };
 		}
 	} else {
-		return { response: { error: 'no se puede procesar la solicitud' } };
+		const requestedFields = request.data?.add ? Object.keys(request.data.add) : [];
+		const stateLabel = opened ? 'open (conf.add)' : 'closed (conf.addClosed)';
+		return errWithDiagnostic(
+			'no se puede procesar la solicitud',
+			`None of the requested fields ${JSON.stringify(requestedFields)} are allowed for ${stateLabel} document in collection '${targetColl}' (allowed: [])`,
+			{
+				reason: 'fields_not_allowed_in_add',
+				collection: targetColl,
+				documentOpen: opened,
+				requestedFields,
+				allowedFields: []
+			}
+		);
 	}
 }
 
@@ -145,7 +158,7 @@ export async function add(mongo: Link, collection: string, request: MgRequest): 
 					collection,
 					operation: 'add',
 					user: request.user,
-					message: 'error en mongo.set',
+					message: formatDiagnosticMessage(collection, 'add', request.user, 'Error in mongo.set operation'),
 					err
 				});
 				return { response: { error: 'error en mongo.set' } };
@@ -154,5 +167,9 @@ export async function add(mongo: Link, collection: string, request: MgRequest): 
 			return writeAdd(coll, conf, request, true, false, undefined, mongo, collection);
 		}
 	}
-	return { response: { error: 'Colección no configurada' } };
+	return errWithDiagnostic(
+		'Colección no configurada',
+		`Collection '${collection}' does not exist in the Monguments collections configuration`,
+		{ reason: 'collection_not_configured', collection, operation: 'add' }
+	);
 }

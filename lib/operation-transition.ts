@@ -3,6 +3,7 @@ import { AdvancedPermission, MgCollectionProperties, MgRequest, MgResult, MgStat
 import { validateQueryFilter } from './query-validator';
 import { write } from './operation-write';
 import { set } from './operation-set';
+import { errWithDiagnostic } from './logger';
 
 export function validateTransition(
 	conf: MgCollectionProperties,
@@ -92,7 +93,13 @@ export async function transition(
 
 	const conf = mongo.getCollectionProperties(collection);
 	if (!conf || !conf.workflow) {
-		return { response: { error: 'Colección o Workflow no configurado' } };
+		return errWithDiagnostic(
+			'Colección o Workflow no configurado',
+			!conf
+				? `Collection '${collection}' does not exist in the Monguments collections configuration`
+				: `Collection '${collection}' does not have 'workflow' configured`,
+			{ reason: !conf ? 'collection_not_configured' : 'workflow_not_configured', collection, operation: 'transition' }
+		);
 	}
 
 	const p = conf.properties;
@@ -110,7 +117,19 @@ export async function transition(
 
 	const validation = validateTransition(conf, doc, targetState, allowedActions, request.data);
 	if (!validation.valid) {
-		return { response: { error: validation.error } };
+		const stateField = conf.workflow.stateField || '_state';
+		const currentState = doc ? doc[stateField] || conf.workflow.initialState : conf.workflow.initialState;
+		return errWithDiagnostic(
+			validation.error || 'Error en transición',
+			`Workflow transition failed on collection '${collection}' (current state: '${currentState}', target: '${targetState}', user allowed actions: ${JSON.stringify(allowedActions || [])})`,
+			{
+				reason: 'workflow_transition_rejected',
+				collection,
+				currentState,
+				targetState,
+				userAllowedActions: allowedActions || []
+			}
+		);
 	}
 
 	const rule = validation.transitionRule!;

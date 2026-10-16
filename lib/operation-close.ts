@@ -1,15 +1,23 @@
 import { Link } from './db-link';
 import { MgRequest, MgResult } from './types';
 import { validateQueryFilter } from './query-validator';
-import { logFromLink } from './logger';
+import { errWithDiagnostic, formatDiagnosticMessage, logFromLink } from './logger';
 
 export const close = async (mongo: Link, collection: string, request: MgRequest): Promise<MgResult> => {
 	const conf = mongo.getCollectionProperties(collection);
 	if (!conf) {
-		return { response: { error: 'Colección no configurada' } };
+		return errWithDiagnostic(
+			'Colección no configurada',
+			`Collection '${collection}' does not exist in the Monguments collections configuration`,
+			{ reason: 'collection_not_configured', collection, operation: 'close' }
+		);
 	}
 	if (!conf.closable) {
-		return { response: { error: 'la colección no es cerrable' } };
+		return errWithDiagnostic(
+			'la colección no es cerrable',
+			`Collection '${collection}' does not have 'closable: true' enabled in its configuration`,
+			{ reason: 'collection_not_closable', collection, closable: conf.closable }
+		);
 	}
 
 	const validQ = validateQueryFilter(request.data);
@@ -20,7 +28,11 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 	const p = conf.properties;
 	const idColl = mongo.getCollectionId(collection);
 	if (!request.data || request.data[idColl] === undefined) {
-		return { response: { error: 'error creado el query' } };
+		return errWithDiagnostic(
+			'error creado el query',
+			`Missing identifier field '${idColl}' in request.data to close document in collection '${collection}'`,
+			{ reason: 'missing_id_in_close_query', collection, idField: idColl }
+		);
 	}
 
 	const date = new Date().getTime();
@@ -88,7 +100,18 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 			if (isOwnerOrExpired) {
 				return { response: { msg: 'documento cerrado' } };
 			} else {
-				return { response: { error: 'no tiene permisos de cerrar el documento' } };
+				return errWithDiagnostic(
+					'no tiene permisos de cerrar el documento',
+					`Collection '${collection}' has 'exclusive: true', user (${request.user}) is not the document creator (${p.w}.id: ${doc[p.w]?.id}) and closeTime (${conf.closeTime} min) has not expired yet`,
+					{
+						reason: 'exclusive_close_denied',
+						collection,
+						exclusive: conf.exclusive,
+						closeTime: conf.closeTime,
+						requestUser: request.user,
+						documentCreator: doc[p.w]?.id
+					}
+				);
 			}
 		} else {
 			const query: any = { ...baseQuery };
@@ -116,7 +139,18 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 				try {
 					const existingDoc = await coll.find({ [idColl]: request.data[idColl] }).next();
 					if (existingDoc) {
-						return { response: { error: 'no tiene permisos de cerrar el documento' } };
+						return errWithDiagnostic(
+							'no tiene permisos de cerrar el documento',
+							`Collection '${collection}' has 'exclusive: true', user (${request.user}) is not the document creator (${p.w}.id: ${existingDoc[p.w]?.id}) and closeTime (${conf.closeTime} min) has not expired yet`,
+							{
+								reason: 'exclusive_close_denied',
+								collection,
+								exclusive: conf.exclusive,
+								closeTime: conf.closeTime,
+								requestUser: request.user,
+								documentCreator: existingDoc[p.w]?.id
+							}
+						);
 					}
 				} catch (err) {
 					logFromLink(mongo, {
@@ -124,7 +158,7 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 						collection,
 						operation: 'close',
 						user: request.user,
-						message: 'ha ocurrido un error (error buscando el documento a cerrar)',
+						message: formatDiagnosticMessage(collection, 'close', request.user, 'An internal database error occurred (error finding document to close)'),
 						err
 					});
 					return { response: { error: 'ha ocurrido un error', msg: 'error buscando el documento a cerrar' } };
@@ -138,7 +172,7 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 			collection,
 			operation: 'close',
 			user: request.user,
-			message: 'ha ocurrido un error (error cerrando el documento a cerrar)',
+			message: formatDiagnosticMessage(collection, 'close', request.user, 'An internal database error occurred (error closing document)'),
 			err: errUpdate
 		});
 		return { response: { error: 'ha ocurrido un error', msg: 'error cerrando el documento a cerrar' } };

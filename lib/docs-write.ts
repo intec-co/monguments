@@ -2,6 +2,7 @@ import { Link } from './db-link';
 import { MgRequest, MgResult, MgW } from './types';
 import { write } from './operation-write';
 import { validateDocumentData } from './query-validator';
+import { errWithDiagnostic } from './logger';
 
 export async function docWrite(mongo: Link, collection: string, request: MgRequest, permissions: string): Promise<MgResult> {
 	const collProperties = mongo.getCollectionProperties(collection);
@@ -17,7 +18,11 @@ export async function docWrite(mongo: Link, collection: string, request: MgReque
 
 				const idColl = collProperties.id || (typeof mongo.getCollectionId === 'function' ? mongo.getCollectionId(collection) : '_id');
 				if (!idColl) {
-					return { response: { error: 'id collection undefined' } };
+					return errWithDiagnostic(
+						'id collection undefined',
+						`Collection '${collection}' does not have the identifier field ('id') configured`,
+						{ reason: 'collection_missing_id', collection, operation: 'write' }
+					);
 				}
 
 				const isAllNewAutoDocs = collProperties.idAuto && request.data.every(doc =>
@@ -81,7 +86,18 @@ export async function docWrite(mongo: Link, collection: string, request: MgReque
 				const res = results.map(rst => rst.data);
 				return { data: res, response: { msg: 'Información guardada' } };
 			} else {
-				return { response: { error: 'No tiene permisos para esta operación' } };
+				return errWithDiagnostic(
+					'No tiene permisos para esta operación',
+					`Insufficient user permissions: batch write (array) on collection '${collection}' requires global write permission 'W' or 'C', but user has permissions '${permissions}' (write: '${permission}')`,
+					{
+						reason: 'user_permission_denied',
+						collection,
+						operation: 'write',
+						permissions,
+						requiredPermission: 'W|C',
+						batchWrite: true
+					}
+				);
 			}
 		} else {
 			if (request.data === undefined) {
@@ -89,17 +105,47 @@ export async function docWrite(mongo: Link, collection: string, request: MgReque
 			}
 			if (permission === 'w' || permission === 'W') {
 				if (permission === 'w' && owner && request.data[owner] !== request.user) {
-					return { response: { error: 'no tiene permiso para escribir el documento' } };
+					const reqOwner = request.data[owner];
+					const isMissingOwnerInPayload = reqOwner === undefined;
+					return errWithDiagnostic(
+						'no tiene permiso para escribir el documento',
+						isMissingOwnerInPayload
+							? `Missing owner field in data for permission 'w': permission 'w' on collection '${collection}' requires request.data.${owner} to match current user (${request.user}), but field '${owner}' was not provided`
+							: `Insufficient user permissions (owner mismatch): permission 'w' only allows writing own documents in collection '${collection}', but request.data.${owner} (${reqOwner}) does not match current user (${request.user})`,
+						{
+							reason: isMissingOwnerInPayload ? 'missing_owner_in_data' : 'owner_mismatch',
+							collection,
+							operation: 'write',
+							permissions,
+							ownerField: owner,
+							requestedOwner: reqOwner,
+							user: request.user
+						}
+					);
 				} else {
 					return write(mongo, collection, request);
 				}
 			} else if (permission === 'C') {
 				return write(mongo, collection, request);
 			} else {
-				return { response: { error: 'No tiene permisos para esta operación' } };
+				return errWithDiagnostic(
+					'No tiene permisos para esta operación',
+					`Insufficient user permissions: 'write' operation on collection '${collection}' requires write permission ('w', 'W', or 'C'), but user has permissions '${permissions}' (write: '${permission}')`,
+					{
+						reason: 'user_permission_denied',
+						collection,
+						operation: 'write',
+						permissions,
+						requiredPermission: 'w|W|C'
+					}
+				);
 			}
 		}
 	} else {
-		return { response: { error: 'Colección no configurada' } };
+		return errWithDiagnostic(
+			'Colección no configurada',
+			`Collection '${collection}' does not exist in the Monguments collections configuration`,
+			{ reason: 'collection_not_configured', collection, operation: 'write' }
+		);
 	}
 }

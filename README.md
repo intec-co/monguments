@@ -663,7 +663,11 @@ const monguments = new Monguments(db, collections, myLogger);
 monguments.setLogger(myLogger);
 ```
 
-### 3. Captured Events & Fault Isolation
+### 3. Captured Events, Root-Cause Diagnostics & Fault Isolation
+- **Contextual Prefix**: Every operational warning/error log includes `[collection: <coll> | op: <op> | user: <user>] <error> — <diagnostic_detail>` in `entry.message` while preserving `MgResult.response.error` unchanged for API compatibility.
+- **Structured Root-Cause Taxonomy (`entry.data.reason`)**:
+  - Permission errors explicitly distinguish between **`user_permission_denied`** (user role lacks read/write/batch permission), **`collection_missing_owner`** (user has owner-scoped `'r'`/`'w'`/`'s'`, but the collection is missing `owner` in its config), and **`owner_mismatch` / `missing_owner_in_data`** (payload owner does not match `request.user`).
+  - Mutation & schema errors report exact details for **`document_closed`** vs. **`exclusive_owner_mismatch`** (`write unfair`), **`fields_not_allowed_in_set`** (`$set is empty`), **`fields_not_allowed_in_add`**, **`collection_not_closable`**, **`missing_id_without_id_auto`**, **`missing_required_field`**, and **`workflow_transition_rejected`**.
 - **`error`**: Native MongoDB driver errors (`insertOne`, `findOneAndUpdate`, `updateOne`, `aggregate`), transaction failures, and Tier 3 compensating rollback outcomes (`err` contains the original `Error`).
 - **`warn`**: NoSQL injection rejections (`$where`, unwhitelisted `$regex`), permission/ownership denials, closed document mutation attempts, workflow state conflicts, and link configuration warnings.
 - **`info`**: Automatic and custom index creation summary (`ensureIndexes`).

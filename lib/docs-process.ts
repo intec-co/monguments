@@ -9,7 +9,7 @@ import { validateMgRequest, validateAdvancedPermissions } from './request-valida
 import { add } from './operation-add';
 import { close } from './operation-close';
 import { transition } from './operation-transition';
-import { logResultIfError } from './logger';
+import { errWithDiagnostic, logResultIfError } from './logger';
 
 const check = (
 	link: Link,
@@ -71,7 +71,15 @@ export const docProcess = async (
 	const userId = request?.user;
 	const checkErr = check(link, collection, request, permissions, advancedPermissions);
 	if (checkErr) {
-		const errRes: MgResult = { response: { error: checkErr } };
+		const errRes = errWithDiagnostic(
+			checkErr,
+			`Request validation rejected on collection '${collection || 'unknown'}' for operation '${opName}'`,
+			{
+				reason: 'request_validation_failed',
+				collection: collection || 'unknown',
+				operation: opName
+			}
+		);
 		logResultIfError(link, collection, opName, userId, errRes);
 		return errRes;
 	}
@@ -92,7 +100,17 @@ export const docProcess = async (
 			if (conf) {
 				if (permission === 'r') {
 					if (!conf.owner) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Incomplete collection configuration: user has owner-scoped read permission ('r', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
+							{
+								reason: 'collection_missing_owner',
+								collection,
+								operation: 'count',
+								permissions,
+								requiredConfig: 'owner'
+							}
+						);
 						break;
 					}
 					if (!request.data) {
@@ -112,10 +130,24 @@ export const docProcess = async (
 						result = { response: { error: err?.message || 'Error al contar documentos' } };
 					}
 				} else {
-					result = { response: { error: 'No tiene permisos para esta operación' } };
+					result = errWithDiagnostic(
+						'No tiene permisos para esta operación',
+						`Insufficient user permissions: 'count' operation on collection '${collection}' requires read permission ('r' or 'R'), but user has permissions '${permissions}' (read: '${permission}')`,
+						{
+							reason: 'user_permission_denied',
+							collection,
+							operation: 'count',
+							permissions,
+							requiredPermission: 'r|R'
+						}
+					);
 				}
 			} else {
-				result = { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = errWithDiagnostic(
+					`La colección: ${collection} no esta configurada`,
+					`Collection '${collection}' does not exist in the Monguments collections configuration`,
+					{ reason: 'collection_not_configured', collection, operation: 'count' }
+				);
 			}
 			break;
 		}
@@ -138,7 +170,17 @@ export const docProcess = async (
 				owner = collProperties.owner;
 				if (permission === 'w') {
 					if (!owner) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Incomplete collection configuration: user has owner-scoped write permission ('w', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
+							{
+								reason: 'collection_missing_owner',
+								collection,
+								operation: 'add',
+								permissions,
+								requiredConfig: 'owner'
+							}
+						);
 						break;
 					}
 					if (!request.data) {
@@ -150,23 +192,61 @@ export const docProcess = async (
 					if (request.data.query[owner] === undefined) {
 						request.data.query[owner] = request.user;
 					} else if (request.data.query[owner] !== request.user) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Insufficient user permissions (owner mismatch): permission 'w' only allows modifying own documents in '${collection}', but request.data.query.${owner} (${request.data.query[owner]}) does not match current user (${request.user})`,
+							{
+								reason: 'owner_mismatch',
+								collection,
+								operation: 'add',
+								permissions,
+								ownerField: owner,
+								requestedOwner: request.data.query[owner],
+								user: request.user
+							}
+						);
 						break;
 					}
 					if (request.data[owner] === undefined) {
 						request.data[owner] = request.user;
 					} else if (request.data[owner] !== request.user) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Insufficient user permissions (owner mismatch): permission 'w' only allows modifying own documents in '${collection}', but request.data.${owner} (${request.data[owner]}) does not match current user (${request.user})`,
+							{
+								reason: 'owner_mismatch',
+								collection,
+								operation: 'add',
+								permissions,
+								ownerField: owner,
+								requestedOwner: request.data[owner],
+								user: request.user
+							}
+						);
 						break;
 					}
 				}
 				if (hasPermission(permission, owner, request)) {
 					result = await add(link, collection, request);
 				} else {
-					result = { response: { error: 'No tiene permisos para esta operación' } };
+					result = errWithDiagnostic(
+						'No tiene permisos para esta operación',
+						`Insufficient user permissions: 'add' operation on collection '${collection}' requires write permission ('w', 'W', or 'C'), but user has permissions '${permissions}' (write: '${permission}')`,
+						{
+							reason: 'user_permission_denied',
+							collection,
+							operation: 'add',
+							permissions,
+							requiredPermission: 'w|W|C'
+						}
+					);
 				}
 			} else {
-				result = { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = errWithDiagnostic(
+					`La colección: ${collection} no esta configurada`,
+					`Collection '${collection}' does not exist in the Monguments collections configuration`,
+					{ reason: 'collection_not_configured', collection, operation: 'add' }
+				);
 			}
 			break;
 		case 'close':
@@ -176,7 +256,17 @@ export const docProcess = async (
 				owner = collProperties.owner;
 				if (permission === 'w') {
 					if (!owner) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Incomplete collection configuration: user has owner-scoped write permission ('w', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
+							{
+								reason: 'collection_missing_owner',
+								collection,
+								operation: 'close',
+								permissions,
+								requiredConfig: 'owner'
+							}
+						);
 						break;
 					}
 					if (!request.data) {
@@ -185,21 +275,51 @@ export const docProcess = async (
 					if (request.data[owner] === undefined) {
 						request.data[owner] = request.user;
 					} else if (request.data[owner] !== request.user) {
-						result = { response: { error: 'No tiene permisos para esta operación' } };
+						result = errWithDiagnostic(
+							'No tiene permisos para esta operación',
+							`Insufficient user permissions (owner mismatch): permission 'w' only allows closing own documents in '${collection}', but request.data.${owner} (${request.data[owner]}) does not match current user (${request.user})`,
+							{
+								reason: 'owner_mismatch',
+								collection,
+								operation: 'close',
+								permissions,
+								ownerField: owner,
+								requestedOwner: request.data[owner],
+								user: request.user
+							}
+						);
 						break;
 					}
 				}
 				if (hasPermission(permission, owner, request)) {
 					result = await close(link, collection, request);
 				} else {
-					result = { response: { error: 'No tiene permisos para esta operación' } };
+					result = errWithDiagnostic(
+						'No tiene permisos para esta operación',
+						`Insufficient user permissions: 'close' operation on collection '${collection}' requires write permission ('w', 'W', 'c', or 'C'), but user has permissions '${permissions}' (write: '${permission}')`,
+						{
+							reason: 'user_permission_denied',
+							collection,
+							operation: 'close',
+							permissions,
+							requiredPermission: 'w|W|c|C'
+						}
+					);
 				}
 			} else {
-				result = { response: { error: `La colección: ${collection} no esta configurada` } };
+				result = errWithDiagnostic(
+					`La colección: ${collection} no esta configurada`,
+					`Collection '${collection}' does not exist in the Monguments collections configuration`,
+					{ reason: 'collection_not_configured', collection, operation: 'close' }
+				);
 			}
 			break;
 		default:
-			result = { response: { error: 'Operación no definida' } };
+			result = errWithDiagnostic(
+				'Operación no definida',
+				`Operation '${request.operation}' is not supported on collection '${collection}'`,
+				{ reason: 'unsupported_operation', collection, operation: request.operation }
+			);
 			break;
 	}
 

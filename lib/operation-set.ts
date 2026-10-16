@@ -2,7 +2,7 @@ import { Collection } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult } from './types';
 import { validateDocumentData, validateQueryFilter } from './query-validator';
-import { logFromLink } from './logger';
+import { errWithDiagnostic, formatDiagnosticMessage, logFromLink } from './logger';
 
 async function writeSet(
 	coll: Collection,
@@ -19,6 +19,7 @@ async function writeSet(
 	const date = new Date().getTime();
 	const p = conf.properties;
 	const properties = opened ? conf.set : conf.setClosed;
+	const targetColl = collectionName || coll.collectionName;
 	if (properties === '*') {
 		setObj = request.data.set;
 		for (const prop in setObj) {
@@ -80,16 +81,29 @@ async function writeSet(
 		} catch (err) {
 			logFromLink(mongo, {
 				level: 'error',
-				collection: collectionName || coll.collectionName,
+				collection: targetColl,
 				operation: 'set',
 				user: request.user,
-				message: 'ha ocurrido un error (error mongo.set document)',
+				message: formatDiagnosticMessage(targetColl, 'set', request.user, 'An internal database error occurred (error mongo.set document)'),
 				err
 			});
 			return { response: { error: 'ha ocurrido un error', msg: 'error mongo.set document' } };
 		}
 	} else {
-		return { response: { error: '$set is empty' } };
+		const requestedFields = request.data?.set ? Object.keys(request.data.set) : [];
+		const stateLabel = opened ? 'open (conf.set)' : 'closed (conf.setClosed)';
+		const allowedDesc = properties === '*' ? '*' : JSON.stringify(properties || []);
+		return errWithDiagnostic(
+			'$set is empty',
+			`None of the requested fields ${JSON.stringify(requestedFields)} are allowed for ${stateLabel} document in collection '${targetColl}' (allowed: ${allowedDesc})`,
+			{
+				reason: 'fields_not_allowed_in_set',
+				collection: targetColl,
+				documentOpen: opened,
+				requestedFields,
+				allowedFields: properties || []
+			}
+		);
 	}
 }
 
@@ -143,7 +157,18 @@ export async function set(mongo: Link, collection: string, request: MgRequest): 
 				}
 				if (conf.exclusive) {
 					if (doc[p.w]?.id !== request.user) {
-						return { response: { error: 'Usuario no es propietario del documento' } };
+						return errWithDiagnostic(
+							'Usuario no es propietario del documento',
+							`Collection '${collection}' has 'exclusive: true' and the document creator (${p.w}.id: ${doc[p.w]?.id}) does not match current user (${request.user})`,
+							{
+								reason: 'exclusive_owner_mismatch',
+								collection,
+								operation: 'set',
+								exclusive: true,
+								documentCreator: doc[p.w]?.id,
+								user: request.user
+							}
+						);
 					}
 				}
 				let opened = false;
@@ -168,7 +193,7 @@ export async function set(mongo: Link, collection: string, request: MgRequest): 
 					collection,
 					operation: 'set',
 					user: request.user,
-					message: 'error en mongo.set',
+					message: formatDiagnosticMessage(collection, 'set', request.user, 'Error in mongo.set operation'),
 					err
 				});
 				return { response: { error: 'error en mongo.set' } };
@@ -177,5 +202,9 @@ export async function set(mongo: Link, collection: string, request: MgRequest): 
 			return writeSet(coll, conf, { ...request, data: { ...request.data, query } }, true, false, undefined, mongo, collection);
 		}
 	}
-	return { response: { error: 'Colección no configurada' } };
+	return errWithDiagnostic(
+		'Colección no configurada',
+		`Collection '${collection}' does not exist in the Monguments collections configuration`,
+		{ reason: 'collection_not_configured', collection, operation: 'set' }
+	);
 }

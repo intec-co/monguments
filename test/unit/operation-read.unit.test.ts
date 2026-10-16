@@ -39,7 +39,7 @@ describe('OperationRead Unit', () => {
 		expect(mockMongo.collection).toHaveBeenCalledWith('testColl');
 		expect(mockCollection.find).toHaveBeenCalledWith({ a: 1 });
 		expect(result).toBe(mockCursor);
-		expect(console.error).toHaveBeenCalledWith('No se encontró configuración para testColl');
+		expect(console.error).toHaveBeenCalledWith('Configuration not found for testColl');
 	});
 
 	it('should append isLast filter property when collection is versionable', () => {

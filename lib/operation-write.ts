@@ -2,7 +2,7 @@ import { Collection, Db, MongoClient } from 'mongodb';
 import { Link } from './db-link';
 import { MgCollectionProperties, MgRequest, MgResult, MgW } from './types';
 import { validateDocumentData } from './query-validator';
-import { logFromLink } from './logger';
+import { errWithDiagnostic, formatDiagnosticMessage, logFromLink } from './logger';
 
 export class ConcurrentModificationError extends Error {
 	constructor(message: string) {
@@ -124,7 +124,7 @@ async function updateVersion(
 			collection: coll.collectionName,
 			operation: 'write',
 			user,
-			message: 'ha ocurrido un error (operations update)',
+			message: formatDiagnosticMessage(coll.collectionName, 'write', user, 'An internal database error occurred (operations update)'),
 			err
 		});
 		return { response: { error: 'ha ocurrido un error', msg: 'operations update' } };
@@ -410,13 +410,23 @@ async function newDoc(
 				collection,
 				operation: 'write',
 				user,
-				message: 'ha ocurrido un error (insertOne)',
+				message: formatDiagnosticMessage(collection, 'write', user, 'An internal database error occurred (insertOne)'),
 				err: error
 			});
 			return { response: { error: 'ha ocurrido un error' } };
 		}
 	} else {
-		return { response: { error: 'new document without idAuto' } };
+		return errWithDiagnostic(
+			'new document without idAuto',
+			`Collection '${collection}' has 'idAuto: false', but identifier field '${idColl}' was not provided in request.data`,
+			{
+				reason: 'missing_id_without_id_auto',
+				collection,
+				operation: 'write',
+				idField: idColl,
+				idAuto: conf.idAuto
+			}
+		);
 	}
 }
 
@@ -446,7 +456,7 @@ async function overwrite(
 			collection: coll.collectionName,
 			operation: 'write',
 			user,
-			message: 'ha ocurrido un error (operations overwrite)',
+			message: formatDiagnosticMessage(coll.collectionName, 'write', user, 'An internal database error occurred (operations overwrite)'),
 			err
 		});
 		return { response: { error: 'ha ocurrido un error', msg: 'operations overwrite' } };
@@ -473,7 +483,7 @@ async function closeDoc(
 			collection: coll.collectionName,
 			operation: 'write',
 			user,
-			message: 'ha ocurrido un error (error al cerrar automaticamente el documetno)',
+			message: formatDiagnosticMessage(coll.collectionName, 'write', user, 'An internal database error occurred (error auto-closing document)'),
 			err
 		});
 		return { response: { error: 'ha ocurrido un error', msg: 'error al cerrar automaticamente el documetno' } };
@@ -483,7 +493,11 @@ async function closeDoc(
 export async function write(mongo: Link, collection: string, request: MgRequest): Promise<MgResult> {
 	const conf: MgCollectionProperties | undefined = mongo.getCollectionProperties(collection);
 	if (!conf) {
-		return { response: { error: 'Colección no configurada' } };
+		return errWithDiagnostic(
+			'Colección no configurada',
+			`Collection '${collection}' does not exist in the Monguments collections configuration`,
+			{ reason: 'collection_not_configured', collection, operation: 'write' }
+		);
 	}
 
 	const p = conf.properties;
@@ -504,12 +518,26 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 
 	const idColl = mongo.getCollectionId(collection);
 	if (!idColl) {
-		return { response: { error: 'id collection undefined' } };
+		return errWithDiagnostic(
+			'id collection undefined',
+			`Collection '${collection}' does not have the identifier field ('id') configured`,
+			{ reason: 'collection_missing_id', collection, operation: 'write' }
+		);
 	}
 	if (conf.required.length > 0) {
 		for (const prop of conf.required) {
 			if (request.data[prop] === undefined) {
-				return { response: { error: `property ${prop} es required` } };
+				return errWithDiagnostic(
+					`property ${prop} es required`,
+					`Required field '${prop}' is missing in request.data for collection '${collection}' (required: ${JSON.stringify(conf.required)})`,
+					{
+						reason: 'missing_required_field',
+						collection,
+						operation: 'write',
+						missingField: prop,
+						requiredFields: conf.required
+					}
+				);
 			}
 		}
 	}
@@ -524,7 +552,17 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 	} else if (conf.idAuto) {
 		action = 'newDoc';
 	} else {
-		return { response: { error: 'new document without idAuto' } };
+		return errWithDiagnostic(
+			'new document without idAuto',
+			`Collection '${collection}' has 'idAuto: false', but identifier field '${idColl}' was not provided in request.data`,
+			{
+				reason: 'missing_id_without_id_auto',
+				collection,
+				operation: 'write',
+				idField: idColl,
+				idAuto: conf.idAuto
+			}
+		);
 	}
 
 	if (conf.id !== '_id' && request.data._id) {
@@ -558,7 +596,7 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 				collection,
 				operation: 'write',
 				user: request.user,
-				message: 'ha ocurrido un error (findDoc => mongoOpWrite)',
+				message: formatDiagnosticMessage(collection, 'write', request.user, 'An internal database error occurred (findDoc => mongoOpWrite)'),
 				err
 			});
 			return { response: { error: 'ha ocurrido un error', msg: 'findDoc => mongoOpWrite' } };
@@ -612,7 +650,7 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 								collection,
 								operation: 'write',
 								user: request.user,
-								message: 'ha ocurrido un error (error al versionar documentos)',
+								message: formatDiagnosticMessage(collection, 'write', request.user, 'An internal database error occurred (error versioning documents)'),
 								err
 							});
 							return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos' } };
@@ -645,7 +683,7 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 							collection,
 							operation: 'write',
 							user: request.user,
-							message: 'ha ocurrido un error (error al versionar documentos)',
+							message: formatDiagnosticMessage(collection, 'write', request.user, 'An internal database error occurred (error versioning documents)'),
 							err
 						});
 						return { response: { error: 'ha ocurrido un error', msg: 'error al versionar documentos' } };
@@ -653,8 +691,26 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 				}
 				case 'close':
 					return closeDoc(coll, conf, findQuery, w, mongo, request.user);
-				case 'unfair':
-					return { response: { error: 'write unfair' } };
+				case 'unfair': {
+					const isDocClosed = Boolean(conf.closable && doc[p.closed]);
+					const docUser = doc[p.w]?.user !== undefined ? doc[p.w]?.user : doc[p.w]?.id;
+					return errWithDiagnostic(
+						'write unfair',
+						isDocClosed
+							? `Document (${idColl}: ${targetId}) in collection '${collection}' is already closed (${p.closed}: true) and does not allow further writes`
+							: `Collection '${collection}' has 'exclusive: true' and the document creator (${p.w}.id: ${docUser}) does not match current user (${request.user})`,
+						{
+							reason: isDocClosed ? 'document_closed' : 'exclusive_owner_mismatch',
+							collection,
+							operation: 'write',
+							documentId: targetId,
+							closed: isDocClosed,
+							exclusive: conf.exclusive,
+							documentCreator: docUser,
+							user: request.user
+						}
+					);
+				}
 				default:
 					return { response: { error: 'write mode unknown' } };
 			}

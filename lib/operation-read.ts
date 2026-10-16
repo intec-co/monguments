@@ -105,7 +105,7 @@ export function read(mongo: Link, collection: string, request: MgRequestRead, op
 				level: 'error',
 				collection,
 				operation,
-				message: `No se encontró configuración para ${collection}`
+				message: `Configuration not found for ${collection}`
 			},
 			true
 		);

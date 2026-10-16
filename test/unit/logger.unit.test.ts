@@ -131,9 +131,20 @@ describe('Monguments Injectable Logger (MgLogger)', () => {
 			collection: 'users',
 			operation: 'read',
 			user: 10,
-			message: 'No tiene permisos para esta operación'
+			data: {
+				reason: 'collection_missing_owner',
+				collection: 'users',
+				operation: 'read',
+				permissions: 'r_',
+				requiredConfig: 'owner'
+			}
 		});
+		expect(entries[0].message).toContain('[collection: users | op: read | user: 10]');
+		expect(entries[0].message).toContain('Permission denied for this operation');
+		expect(entries[0].message).toContain("does not have the 'owner' field configured");
+
 		expect(entries[1].level).toBe('warn');
+		expect(entries[1].message).toContain('[collection: users | op: read | user: 10]');
 		expect(entries[1].message).toContain('$where');
 
 		expect(entries[2].level).toBe('error');
@@ -143,7 +154,94 @@ describe('Monguments Injectable Logger (MgLogger)', () => {
 
 		expect(entries[3].level).toBe('error');
 		expect(entries[3].operation).toBe('count');
+		expect(entries[3].message).toContain('[collection: users | op: count | user: 10]');
 		expect((entries[3].err as Error).message).toBe('count failure');
+	});
+
+	it('should distinguish between user_permission_denied, collection_missing_owner, owner_mismatch, document_closed, and $set is empty', async () => {
+		const entries: MgLogEntry[] = [];
+		const mockColl: any = {
+			collectionName: 'orders',
+			find: vi.fn().mockReturnValue({
+				next: vi.fn().mockResolvedValue({
+					orderId: 77,
+					userId: 10,
+					_closed: true,
+					_w: { id: 10, date: 1000 }
+				})
+			}),
+			findOne: vi.fn().mockResolvedValue({
+				orderId: 77,
+				userId: 10,
+				_closed: false,
+				_w: { id: 99, date: Date.now() }
+			}),
+			updateOne: vi.fn().mockResolvedValue({ matchedCount: 0, modifiedCount: 0 })
+		};
+		const mockDb: any = {
+			collection: vi.fn().mockReturnValue(mockColl)
+		};
+
+		const mg = createMonguments(
+			mockDb,
+			{
+				orders: {
+					id: 'orderId',
+					idAuto: false,
+					owner: 'userId',
+					closable: true,
+					closeTime: -1,
+					exclusive: true,
+					set: ['status'],
+					required: ['total'],
+					properties: baseProperties
+				},
+				reportsNoOwner: {
+					id: 'reportId',
+					closable: false,
+					properties: baseProperties
+				}
+			},
+			undefined,
+			(entry) => entries.push(entry)
+		);
+
+		// 1. User lacks write role permission ('R_' on write)
+		const r1 = await mg.process('orders', { operation: 'write', user: 10, data: { orderId: 1, userId: 10, total: 100 } }, 'R_');
+		expect(r1.response?.error).toBe('No tiene permisos para esta operación');
+		expect(entries[0].data?.reason).toBe('user_permission_denied');
+		expect(entries[0].message).toContain('[collection: orders | op: write | user: 10]');
+		expect(entries[0].message).toContain('Insufficient user permissions');
+
+		// 2. Owner-scoped permission ('rw') on collection without owner configured
+		const r2 = await mg.process('reportsNoOwner', { operation: 'set', user: 10, data: { query: { reportId: 1 }, set: { title: 'x' } } }, 'rw');
+		expect(r2.response?.error).toBe('No tiene permisos para esta operación');
+		expect(entries[1].data?.reason).toBe('collection_missing_owner');
+		expect(entries[1].message).toContain('[collection: reportsNoOwner | op: set | user: 10]');
+		expect(entries[1].message).toContain("does not have the 'owner' field configured");
+
+		// 3. Owner mismatch in payload ('rw' where userId != request.user)
+		const r3 = await mg.process('orders', { operation: 'write', user: 10, data: { orderId: 1, userId: 999, total: 100 } }, 'rw');
+		expect(r3.response?.error).toBe('no tiene permiso para escribir el documento');
+		expect(entries[2].data?.reason).toBe('owner_mismatch');
+		expect(entries[2].message).toContain('owner mismatch');
+
+		// 4. Write unfair due to document already closed
+		const r4 = await mg.process('orders', { operation: 'write', user: 10, data: { orderId: 77, userId: 10, total: 100 } }, 'RW');
+		expect(r4.response?.error).toBe('write unfair');
+		expect(entries[3].data?.reason).toBe('document_closed');
+		expect(entries[3].message).toContain('is already closed');
+
+		// 5. $set is empty when requested field is not in conf.set
+		const r5 = await mg.process('orders', { operation: 'set', user: 99, data: { query: { orderId: 77 }, set: { forbiddenField: 'val' } } }, 'RW');
+		expect(r5.response?.error).toBe('$set is empty');
+		expect(entries[4].data?.reason).toBe('fields_not_allowed_in_set');
+		expect(entries[4].message).toContain('forbiddenField');
+
+		// 6. Close on non-closable collection
+		const r6 = await mg.process('reportsNoOwner', { operation: 'close', user: 10, data: { reportId: 1 } }, 'RW');
+		expect(r6.response?.error).toBe('la colección no es cerrable');
+		expect(entries[5].data?.reason).toBe('collection_not_closable');
 	});
 
 	it('should log info, warn, and error events during ensureIndexes', async () => {
