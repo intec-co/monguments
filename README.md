@@ -100,6 +100,7 @@ const monguments = await mgConnectDb(
 const request: MgRequest = {
   user: 1001,
   ips: ['127.0.0.1'],
+  traceId: 'req-trace-001',
   operation: 'write',
   data: { title: 'Keyboard', price: 49.99 }
 };
@@ -245,12 +246,13 @@ Monguments manages metadata properties based on your collection configuration:
   "_w": {
     "id": 1001,
     "date": 1690000000000,
-    "ips": ["127.0.0.1"]
+    "ips": ["127.0.0.1"],
+    "trace": "req-trace-001"
   }
 }
 ```
 
-- **`_w`**: Traceability block updated on write/set operations containing user ID (`id`), execution timestamp (`date`), and client IP addresses (`ips`).
+- **`_w`**: Traceability block updated on write/set operations containing user ID (`id`), execution timestamp (`date`), client IP addresses (`ips`), and optional distributed tracing ID (`trace`).
 - **`_isLast`**: Boolean flag set to `true` on the active/latest version of a versioned document.
 - **`_closed`**: Boolean flag set to `true` when a document is locked via `close()`.
 
@@ -647,6 +649,7 @@ const monguments = await mgConnectDb(
         collection: entry.collection,
         operation: entry.operation,
         userId: entry.user,
+        traceId: entry.traceId,
         err: entry.err,
         data: entry.data
       });
@@ -664,7 +667,7 @@ monguments.setLogger(myLogger);
 ```
 
 ### 3. Captured Events, Root-Cause Diagnostics & Fault Isolation
-- **Contextual Prefix**: Every operational warning/error log includes `[collection: <coll> | op: <op> | user: <user>] <error> — <diagnostic_detail>` in `entry.message` while preserving `MgResult.response.error` unchanged for API compatibility.
+- **Contextual Prefix**: Every operational warning/error log includes `[collection: <coll> | op: <op> | user: <user>]` (or `[collection: <coll> | op: <op> | user: <user> | trace: <traceId>]` when a distributed tracing ID is supplied in the request) in `entry.message` while preserving `MgResult.response.error` unchanged for API compatibility.
 - **Structured Root-Cause Taxonomy (`entry.data.reason`)**:
   - Permission errors explicitly distinguish between **`user_permission_denied`** (user role lacks read/write/batch permission), **`collection_missing_owner`** (user has owner-scoped `'r'`/`'w'`/`'s'`, but the collection is missing `owner` in its config), and **`owner_mismatch` / `missing_owner_in_data`** (payload owner does not match `request.user`).
   - Mutation & schema errors report exact details for **`document_closed`** vs. **`exclusive_owner_mismatch`** (`write unfair`), **`fields_not_allowed_in_set`** (`$set is empty`), **`fields_not_allowed_in_add`**, **`collection_not_closable`**, **`missing_id_without_id_auto`**, **`missing_required_field`**, and **`workflow_transition_rejected`**.

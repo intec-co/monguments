@@ -163,14 +163,19 @@ export function formatDiagnosticMessage(
 	operation: string,
 	user: number | undefined,
 	baseMessage: string,
-	diagnosticDetail?: string
+	diagnosticDetail?: string,
+	traceId?: string
 ): string {
 	const coll = collection || 'unknown';
 	const op = operation || 'unknown';
-	const prefix =
-		user !== undefined
-			? `[collection: ${coll} | op: ${op} | user: ${user}]`
-			: `[collection: ${coll} | op: ${op}]`;
+	const parts: string[] = [`collection: ${coll}`, `op: ${op}`];
+	if (user !== undefined) {
+		parts.push(`user: ${user}`);
+	}
+	if (traceId) {
+		parts.push(`trace: ${traceId}`);
+	}
+	const prefix = `[${parts.join(' | ')}]`;
 
 	const englishBase = translateErrorToEnglish(baseMessage);
 	const core = englishBase.startsWith('[collection:') ? englishBase : `${prefix} ${englishBase}`;
@@ -241,7 +246,8 @@ export function logResultIfError(
 	operation: string,
 	user: number | undefined,
 	result: MgResult | undefined,
-	err?: unknown
+	err?: unknown,
+	traceId?: string
 ): void {
 	const errMsg = result?.response?.error;
 	if (!result || !errMsg) {
@@ -264,7 +270,9 @@ export function logResultIfError(
 		collection,
 		operation,
 		user,
-		message: formatDiagnosticMessage(collection, operation, user, baseMsg, diag?.detail),
+		traceId,
+		trace: traceId,
+		message: formatDiagnosticMessage(collection, operation, user, baseMsg, diag?.detail, traceId),
 		data: diag?.data,
 		err: err !== undefined ? err : undefined
 	});

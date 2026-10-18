@@ -140,12 +140,14 @@ export async function transition(
 	delete updatedData._id;
 	updatedData[stateField] = targetState;
 
+	const traceId = request.traceId || request.trace;
 	if (rule.autoClose) {
 		updatedData[p.closed] = true;
 		updatedData._wClose = {
 			date,
 			id: request.user,
-			ips: request.ips
+			ips: request.ips,
+			...(traceId ? { trace: traceId } : {})
 		};
 	}
 
@@ -154,14 +156,21 @@ export async function transition(
 		const writeReq: MgRequest = {
 			user: request.user,
 			ips: request.ips,
-			data: updatedData
+			data: updatedData,
+			traceId: request.traceId,
+			trace: request.trace
 		};
 		return write(mongo, collection, writeReq);
 	} else {
 		const setPayload: any = { [stateField]: targetState };
 		if (rule.autoClose) {
 			setPayload[p.closed] = true;
-			setPayload._wClose = { date, id: request.user, ips: request.ips };
+			setPayload._wClose = {
+				date,
+				id: request.user,
+				ips: request.ips,
+				...(traceId ? { trace: traceId } : {})
+			};
 		}
 
 		const setReq: MgRequest = {
@@ -170,7 +179,9 @@ export async function transition(
 			data: {
 				query: filterQuery,
 				set: setPayload
-			}
+			},
+			traceId: request.traceId,
+			trace: request.trace
 		};
 		return set(mongo, collection, setReq);
 	}

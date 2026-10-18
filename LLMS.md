@@ -232,6 +232,8 @@ export interface MgRequest {
   query?: any;                     // Query filter for 'set' or 'add' operations
   set?: any;                       // Target fields for 'set' operations
   params?: MGParamsRead;           // Query parameters (sort, limit, skip, lookup, link)
+  traceId?: string;                // Distributed trace ID for request tracking and logs
+  trace?: string;                  // Alias for traceId
 }
 ```
 
@@ -497,6 +499,8 @@ export type MgLogEntry = {
   collection?: string;
   operation?: string;
   user?: number;
+  traceId?: string;
+  trace?: string;
   err?: unknown;
   data?: Record<string, unknown>;
 };
@@ -516,7 +520,7 @@ export type MgLogger = MgLoggerFn | MgLoggerObject;
 
 ### Contextual Diagnostic Messages & Root-Cause Taxonomy (`entry.message` & `entry.data`)
 While `MgResult.response.error` preserves backward-compatible API error strings, `MgLogEntry.message` and `MgLogEntry.data` provide rich diagnostic context:
-- **Contextual Prefix**: `[collection: <coll> | op: <op> | user: <user>] <error> — <diagnostic_detail>`
+- **Contextual Prefix**: `[collection: <coll> | op: <op> | user: <user> | trace: <traceId>] <error> — <diagnostic_detail>`
 - **Diagnostic Root Causes (`entry.data.reason`)**:
   - `user_permission_denied`: Insufficient role permission string (e.g., `'R_'` on `write`, `'rw'` on batch array `write`).
   - `collection_missing_owner`: User has owner-scoped permission (`'r'`, `'w'`, `'s'`), but the collection configuration in `collections.json` omits `owner`.

@@ -69,6 +69,7 @@ export const docProcess = async (
 ): Promise<MgResult> => {
 	const opName = request?.operation || 'process';
 	const userId = request?.user;
+	const traceId = request?.traceId || request?.trace;
 	const checkErr = check(link, collection, request, permissions, advancedPermissions);
 	if (checkErr) {
 		const errRes = errWithDiagnostic(
@@ -80,7 +81,7 @@ export const docProcess = async (
 				operation: opName
 			}
 		);
-		logResultIfError(link, collection, opName, userId, errRes);
+		logResultIfError(link, collection, opName, userId, errRes, undefined, traceId);
 		return errRes;
 	}
 
@@ -323,6 +324,6 @@ export const docProcess = async (
 			break;
 	}
 
-	logResultIfError(link, collection, opName, userId, result, caughtErr);
+	logResultIfError(link, collection, opName, userId, result, caughtErr, traceId);
 	return result;
 };

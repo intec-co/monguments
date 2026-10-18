@@ -20,6 +20,7 @@ async function writeSet(
 	const p = conf.properties;
 	const properties = opened ? conf.set : conf.setClosed;
 	const targetColl = collectionName || coll.collectionName;
+	const traceId = request.traceId || request.trace;
 	if (properties === '*') {
 		setObj = request.data.set;
 		for (const prop in setObj) {
@@ -29,7 +30,8 @@ async function writeSet(
 					value: setObj[prop],
 					date,
 					id: request.user,
-					ips: request.ips
+					ips: request.ips,
+					...(traceId ? { trace: traceId } : {})
 				};
 			}
 		}
@@ -42,7 +44,8 @@ async function writeSet(
 					value: setObj[prop],
 					date,
 					id: request.user,
-					ips: request.ips
+					ips: request.ips,
+					...(traceId ? { trace: traceId } : {})
 				};
 			}
 		});
@@ -51,7 +54,8 @@ async function writeSet(
 		const w = {
 			date,
 			id: request.user,
-			ips: request.ips
+			ips: request.ips,
+			...(traceId ? { trace: traceId } : {})
 		};
 		setObj[p.closed] = true;
 		setObj._wClose = w;

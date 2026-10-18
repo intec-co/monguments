@@ -502,10 +502,12 @@ export async function write(mongo: Link, collection: string, request: MgRequest)
 
 	const p = conf.properties;
 	const now = new Date().getTime();
+	const traceId = request.traceId || request.trace;
 	const w: MgW = {
 		id: request.user,
 		date: now,
-		ips: request.ips
+		ips: request.ips,
+		...(traceId ? { trace: traceId } : {})
 	};
 
 	if (request.data === undefined) {

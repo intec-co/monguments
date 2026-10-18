@@ -39,6 +39,7 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 	const coll = mongo.collection(collection);
 
 	const minDate = conf.closeTime >= 0 ? date - (conf.closeTime * 60000) : null;
+	const traceId = request.traceId || request.trace;
 
 	const baseQuery: any = {
 		[idColl]: request.data[idColl],
@@ -80,7 +81,8 @@ export const close = async (mongo: Link, collection: string, request: MgRequest)
 									else: 0
 								}
 							},
-							ips: request.ips
+							ips: request.ips,
+							...(traceId ? { trace: traceId } : {})
 						},
 						else: '$_wClose'
 					}

@@ -74,6 +74,7 @@ export type MgW = {
 	date: number;
 	id: number;
 	ips?: Array<string>;
+	trace?: string;
 }
 
 export type MgLogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -84,6 +85,8 @@ export type MgLogEntry = {
 	collection?: string;
 	operation?: string;
 	user?: number;
+	traceId?: string;
+	trace?: string;
 	err?: unknown;
 	data?: Record<string, unknown>;
 }
@@ -132,6 +135,9 @@ export type MgRequest = {
 	query?: Array<any> | any;
 	set?: Array<any> | any;
 	user: number;
+	traceId?: string;
+	trace?: string;
+	targetState?: string;
 }
 export type MgRequestRead = {
 	data: any;

@@ -281,4 +281,67 @@ describe('Monguments Injectable Logger (MgLogger)', () => {
 		expect(entries[3].level).toBe('error');
 		expect(entries[3].operation).toBe('ensureIndexes');
 	});
+
+	it('should capture traceId in MgLogEntry and in diagnostic message prefix', async () => {
+		const entries: MgLogEntry[] = [];
+		const insertedDocs: any[] = [];
+		const mockColl: any = {
+			collectionName: 'tasks',
+			find: vi.fn().mockReturnValue({ next: vi.fn().mockResolvedValue(null) }),
+			insertOne: vi.fn().mockImplementation(async (doc: any) => {
+				insertedDocs.push(doc);
+				return { insertedId: 'id-123' };
+			})
+		};
+		const mockDb: any = {
+			collection: vi.fn().mockReturnValue(mockColl)
+		};
+
+		const mg = createMonguments(
+			mockDb,
+			{
+				tasks: {
+					id: 'taskId',
+					idAuto: false,
+					set: ['status'],
+					properties: baseProperties
+				}
+			},
+			undefined,
+			(entry) => entries.push(entry)
+		);
+
+		// 1. Process with traceId rejection -> check entry.traceId and message prefix
+		const resPerm = await mg.process(
+			'tasks',
+			{
+				operation: 'read',
+				user: 10,
+				data: { taskId: 1 },
+				traceId: 'trace-req-999'
+			},
+			'r_'
+		);
+		expect(resPerm.response?.error).toBe('No tiene permisos para esta operación');
+		expect(entries).toHaveLength(1);
+		expect(entries[0].traceId).toBe('trace-req-999');
+		expect(entries[0].message).toContain('[collection: tasks | op: read | user: 10 | trace: trace-req-999]');
+
+		// 2. Write with traceId -> check _w.trace
+		const resWrite = await mg.process(
+			'tasks',
+			{
+				operation: 'write',
+				user: 10,
+				data: { taskId: 101, title: 'Test Task' },
+				traceId: 'trace-write-888'
+			},
+			'RW'
+		);
+		expect(resWrite.response?.error).toBeUndefined();
+		expect(insertedDocs).toHaveLength(1);
+		expect(insertedDocs[0]._w).toBeDefined();
+		expect(insertedDocs[0]._w.trace).toBe('trace-write-888');
+		expect(insertedDocs[0]._w.id).toBe(10);
+	});
 });

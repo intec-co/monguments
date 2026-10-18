@@ -21,10 +21,12 @@ async function writeAdd(
 	const p = conf.properties;
 	const targetColl = collectionName || coll.collectionName;
 
+	const traceId = request.traceId || request.trace;
 	const w = {
 		date,
 		id: request.user,
-		ips: request.ips
+		ips: request.ips,
+		...(traceId ? { trace: traceId } : {})
 	};
 
 	if (toClosed) {

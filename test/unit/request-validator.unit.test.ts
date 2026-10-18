@@ -49,6 +49,13 @@ describe('Request Validator Unit Tests', () => {
 			expect(validateMgRequest({ operation: 123 })).toBe('Invalid request: operation: Expected string');
 			expect(validateMgRequest({ operation: {} })).toBe('Invalid request: operation: Expected string');
 		});
+
+		it('should accept valid traceId or trace string, and reject non-string values', () => {
+			expect(validateMgRequest({ traceId: 'trace-123' })).toBeNull();
+			expect(validateMgRequest({ trace: 'trace-456' })).toBeNull();
+			expect(validateMgRequest({ traceId: 123 })).toBe('Invalid request: traceId: Expected string');
+			expect(validateMgRequest({ trace: {} })).toBe('Invalid request: trace: Expected string');
+		});
 	});
 
 	describe('validateAdvancedPermissions', () => {

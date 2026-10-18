@@ -29,6 +29,18 @@ export function validateMgRequest(request: unknown): string | null {
 		}
 	}
 
+	if (req.traceId !== undefined) {
+		if (typeof req.traceId !== 'string') {
+			return 'Invalid request: traceId: Expected string';
+		}
+	}
+
+	if (req.trace !== undefined) {
+		if (typeof req.trace !== 'string') {
+			return 'Invalid request: trace: Expected string';
+		}
+	}
+
 	return null;
 }
 
