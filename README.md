@@ -219,12 +219,16 @@ Monguments enforces access control using a **2-character permission string**: `"
  "rw" -> Read Own (r), Write Own (w)
  "Rc" -> Read All (R), Create Own Only (c)
  "RC" -> Read All (R), Create Any (C)
+ "ow" -> Read Own Single Document Only (o; blocks readList & count), Write Own (w)
+ "Ow" -> Read Any Single Document Only (O; blocks readList & count), Write Own (w)
 ```
 
 | Permission Character | Scope | Meaning |
 | :--- | :--- | :--- |
-| **Read**: `'r'` | Own | Can read only documents where `doc[owner] === request.user`. |
-| **Read**: `'R'` | All | Can read all documents in the collection regardless of ownership. |
+| **Read**: `'r'` | Own | Can read (`read`, `readList`, `count`) only documents where `doc[owner] === request.user`. |
+| **Read**: `'R'` | All | Can read (`read`, `readList`, `count`) all documents in the collection regardless of ownership. |
+| **Read**: `'o'` | Own (Single) | Can read only 1 document per query (`read`) where `doc[owner] === request.user`. Blocks `readList` and `count`. |
+| **Read**: `'O'` | All (Single) | Can read only 1 document per query (`read`) across the collection. Blocks `readList` and `count`. |
 | **Write**: `'w'` | Own | Can write/update/close only documents owned by `request.user`. |
 | **Write**: `'W'` | All | Can write/update/close any document in the collection. |
 | **Write**: `'c'` | Own | Can create new documents only, setting ownership to `request.user`. |

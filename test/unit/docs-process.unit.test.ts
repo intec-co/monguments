@@ -212,6 +212,24 @@ describe('DocProcess Unit', () => {
 			expect(res).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
 		});
 
+		it('should reject count when permission is lowercase o or uppercase O', async () => {
+			mockLink.getCollectionProperties.mockReturnValue({
+				owner: 'ownerId',
+				versionable: false
+			});
+			(hasPermission as Mock).mockReturnValue(true);
+
+			const reqLower = { user: 'user1', data: { ownerId: 'user1' }, operation: 'count' };
+			const reqUpper = { user: 'user1', data: {}, operation: 'count' };
+
+			const resLower = await docProcess(mockLink, 'test', reqLower, 'o--');
+			const resUpper = await docProcess(mockLink, 'test', reqUpper, 'O--');
+
+			expect(resLower).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+			expect(resUpper).toEqual({ response: { error: 'No tiene permisos para esta operación' } });
+			expect(mockCollection.countDocuments).not.toHaveBeenCalled();
+		});
+
 		it('should return 0 when countDocuments resolves to 0 or null', async () => {
 			mockLink.getCollectionProperties.mockReturnValue({ owner: 'ownerId', versionable: false });
 			(hasPermission as Mock).mockReturnValue(true);

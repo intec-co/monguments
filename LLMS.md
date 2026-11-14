@@ -202,18 +202,20 @@ Permissions strings are strictly **2 characters**: `"<ReadScope><WriteScope>"`
 | `'Rc'` | All documents | Create own documents only | Shared reading, private creation |
 | `'RC'` | All documents | Create document for any owner | Superuser creation pipeline |
 | `'rW'` | Own documents only | Write any document | Restricted view, privileged write |
+| `'ow'` | Own single document only (`read` only; `readList` & `count` denied) | Write own documents only | Single-record self-service lookup without list exposure |
+| `'Ow'` / `'O_'` | Any single document only (`read` only; `readList` & `count` denied) | Write own or read-only | Point lookup by ID/token without exposing collection listing |
 
-- **Read Scope**: `'r'` = matching `doc[owner] === request.user`; `'R'` = all documents in collection.
+- **Read Scope**: `'r'` = matching `doc[owner] === request.user` (`read`, `readList`, `count`); `'R'` = all documents in collection (`read`, `readList`, `count`); `'o'` = single-document `read` matching `doc[owner] === request.user` (`readList` and `count` denied); `'O'` = single-document `read` for any document (`readList` and `count` denied).
 - **Write Scope**: `'w'` = write own only; `'W'` = write any; `'c'` = create own only; `'C'` = create any.
 
 #### Automatic Owner Injection
 When a collection configures an `owner` property:
-1. **Owner-Scoped Read (`'r'`)**: On `read`, `readList`, and `count`, if the request omits the owner field in `req.data`, Monguments automatically injects `req.data[conf.owner] = req.user`.
+1. **Owner-Scoped Read (`'r'` / `'o'`)**: On `read`, `readList` (`'r'` only), and `count` (`'r'` only), if the request omits the owner field in `req.data`, Monguments automatically injects `req.data[conf.owner] = req.user`.
 2. **Owner-Scoped Write/Mutations (`'w'` / `'s'`)**:
    - On **`set`** and **`add`**: If `request.data.query` omits the owner field, it automatically injects `query[conf.owner] = request.user`. If provided but mismatched with `request.user`, it returns `'No tiene permisos para esta operación'`.
    - On **`close`**: If `request.data` omits the owner field, it automatically injects `request.data[conf.owner] = request.user`. If mismatched, it returns error and restricts the closure query by `owner`.
-3. **Missing Owner Config**: If an operation is invoked with an owner-scoped permission (`'r'`, `'w'`, `'s'`) but the collection does not have `owner` configured, the operation is rejected immediately with `'No tiene permisos para esta operación'`.
-4. **Global Scope (`'R'`, `'W'`)**: Admin permissions bypass owner injection and match across all documents.
+3. **Missing Owner Config**: If an operation is invoked with an owner-scoped permission (`'r'`, `'o'`, `'w'`, `'s'`) but the collection does not have `owner` configured, the operation is rejected immediately with `'No tiene permisos para esta operación'`.
+4. **Global Scope (`'R'`, `'O'`, `'W'`)**: Global permissions bypass owner injection (`'O'` permits single-document `read` only; `'R'` and `'W'` match across all documents).
 5. **NoSQL Defense in `link.query`**: Conditions beyond the foreign field in `singleLink.query` (`extraConditions`) are strictly validated against `validateQueryFilter`. Disallowed operators (`$where`, `$function`), ReDoS patterns, or prototype keys immediately drop the link.
 6. **Projection Preservation**: Inclusive projections (`params.project`) automatically preserve linked fields (`params.project[link.to] = 1`), preventing MongoDB's pipeline from pruning joined relational data.
 7. **BSON 16 MB Overflow Control (`asArray: true`)**: When retrieving relational links as arrays, lookups are automatically transformed into pipeline lookups with pagination and an enforced safety limit ceiling (`maxLimit || 1000`). Custom `limit` (capped by `maxLimit`), `skip`, and `sort` options in `MgLink` are supported to prevent unbounded arrays from exceeding the BSON document size limit.

@@ -119,7 +119,7 @@ export const docProcess = async (
 					}
 					request.data[conf.owner] = request.user;
 				}
-				if (hasPermission(permission, conf.owner, request)) {
+				if ((permission === 'r' || permission === 'R') && hasPermission(permission, conf.owner, request)) {
 					if (conf.versionable && !request.data[conf.properties.isLast]) {
 						request.data[conf.properties.isLast] = true;
 					}

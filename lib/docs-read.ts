@@ -252,12 +252,25 @@ function checkRequest(
 			{ reason: 'collection_not_configured', collection, operation: opName }
 		);
 	}
+	if (opName === 'readList' && (permission === 'o' || permission === 'O')) {
+		return errWithDiagnostic(
+			'No tiene permisos para esta operación',
+			`Insufficient user permissions: 'readList' operation on collection '${collection}' requires read permission ('r' or 'R'), but user has permissions '${permissions}' (read: '${permission}')`,
+			{
+				reason: 'user_permission_denied',
+				collection,
+				operation: opName,
+				permissions,
+				requiredPermission: 'r|R'
+			}
+		);
+	}
 	const owner = collectionConf.owner;
-	if (permission === 'r') {
+	if (permission === 'r' || permission === 'o') {
 		if (!owner) {
 			return errWithDiagnostic(
 				'No tiene permisos para esta operación',
-				`Incomplete collection configuration: user has owner-scoped read permission ('r', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
+				`Incomplete collection configuration: user has owner-scoped read permission ('${permission}', permissions: '${permissions}'), but collection '${collection}' does not have the 'owner' field configured`,
 				{
 					reason: 'collection_missing_owner',
 					collection,
@@ -275,10 +288,10 @@ function checkRequest(
 		}
 	}
 	if (!hasPermission(permission, owner, req)) {
-		if (permission === 'r' && owner && req.data && req.data[owner] !== req.user) {
+		if ((permission === 'r' || permission === 'o') && owner && req.data && req.data[owner] !== req.user) {
 			return errWithDiagnostic(
 				'No tiene permisos para esta operación',
-				`Insufficient user permissions (owner mismatch): permission 'r' only allows querying own documents in collection '${collection}', but field '${owner}' in request (${req.data[owner]}) does not match current user (${req.user})`,
+				`Insufficient user permissions (owner mismatch): permission '${permission}' only allows querying own documents in collection '${collection}', but field '${owner}' in request (${req.data[owner]}) does not match current user (${req.user})`,
 				{
 					reason: 'owner_mismatch',
 					collection,
@@ -292,13 +305,13 @@ function checkRequest(
 		}
 		return errWithDiagnostic(
 			'No tiene permisos para esta operación',
-			`Insufficient user permissions: '${opName}' operation on collection '${collection}' requires read permission ('r' or 'R'), but user has permissions '${permissions}' (read: '${permission}')`,
+			`Insufficient user permissions: '${opName}' operation on collection '${collection}' requires read permission ('r' or 'R'${opName === 'readList' ? '' : ", 'o', or 'O'"}), but user has permissions '${permissions}' (read: '${permission}')`,
 			{
 				reason: 'user_permission_denied',
 				collection,
 				operation: opName,
 				permissions,
-				requiredPermission: 'r|R'
+				requiredPermission: opName === 'readList' ? 'r|R' : 'r|R|o|O'
 			}
 		);
 	}
